@@ -83,34 +83,61 @@
         <div class="metric"><div class="label">Endring i perioden</div><div class="value" id="hist-change">—</div></div>
         <div class="metric"><div class="label">Datapunkter SOC / Pb / Pc / Bc</div><div class="value" style="font-size:1.15rem" id="hist-counts">—</div></div>
       </div>
-      <h3>Batteriprosent</h3><canvas id="hist-soc" height="190"></canvas>
-      <h3>Energiflyt per time (kWh)</h3><canvas id="hist-energy" height="210"></canvas>
+      <h3>Batteriprosent</h3><div class="chart-wrap"><canvas id="hist-soc" height="190" aria-label="Batteriprosent over tid. Hold musepekeren over grafen eller trykk på grafen for dato og verdi." role="img"></canvas><div class="chart-tip" id="hist-soc-tip"></div></div>
+      <h3>Energiflyt per time (kWh)</h3><div class="chart-wrap"><canvas id="hist-energy" height="210" aria-label="Energiflyt per time. Hold musepekeren over grafen eller trykk på grafen for dato og verdier." role="img"></canvas><div class="chart-tip" id="hist-energy-tip"></div></div>
       <p class="subtle" id="hist-message" aria-live="polite">Henter historikk …</p>
     </section>
     <style>
       .periods{display:flex;gap:.5rem;margin:.8rem 0 1rem;flex-wrap:wrap}
       .periods button{border:1px solid #cbd6cd;border-radius:999px;padding:.5rem .9rem;background:#fff;color:#244536;cursor:pointer}
       .periods button.active{background:#173b32;color:#fff}
-      #energy-history canvas{display:block;width:100%;height:190px;margin:.5rem 0 1rem}
+      #energy-history canvas{display:block;width:100%;height:190px;margin:.5rem 0 1rem;touch-action:pan-y;cursor:crosshair}
+      #energy-history .chart-wrap{position:relative;width:100%}
+      #energy-history .chart-tip{display:none;position:absolute;z-index:2;top:.5rem;left:.5rem;max-width:calc(100% - 1rem);padding:.55rem .7rem;background:#173b32;color:#fff;border-radius:.5rem;font-size:.8rem;line-height:1.45;white-space:pre-line;box-shadow:0 2px 10px #0002;pointer-events:none}
+      #energy-history .periods button:focus-visible{outline:3px solid #e3a12f;outline-offset:2px}
+      @media(max-width:600px){#energy-history .metric{min-height:95px;padding:.75rem}#energy-history .metric .value{font-size:1.35rem}#energy-history h3{font-size:1rem}}
     </style>
     <script>
     (() => {
       const buttons=[...document.querySelectorAll('.periods button')];
       const note=document.getElementById('hist-message');
       const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
+      const chartState={};
       function chart(id,series,percent){
-        const c=document.getElementById(id),w=Math.max(300,c.clientWidth||600),h=id==='hist-energy'?210:190,d=window.devicePixelRatio||1;
-        c.width=w*d;c.height=h*d;c.style.height=h+'px';const x=c.getContext('2d');x.scale(d,d);x.clearRect(0,0,w,h);
-        const all=series.flatMap(s=>s.points.map(p=>p.value)).filter(Number.isFinite);
-        if(!all.length){x.fillStyle='#758179';x.font='13px sans-serif';x.fillText('Ingen historiske målinger tilgjengelig',12,25);return;}
+        const c=document.getElementById(id),tip=document.getElementById(id+'-tip'),w=Math.max(300,c.clientWidth||600),h=id==='hist-energy'?210:190,d=window.devicePixelRatio||1;
+        c.width=w*d;c.height=h*d;c.style.height=h+'px';const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);
+        const clean=series.map(s=>({...s,points:s.points.filter(p=>Number.isFinite(p.value)&&Number.isFinite(p.timestamp)).slice().sort((a,b)=>a.timestamp-b.timestamp)}));
+        const all=clean.flatMap(s=>s.points.map(p=>p.value));
+        if(!all.length){x.fillStyle='#758179';x.font='13px sans-serif';x.fillText('Ingen historiske målinger tilgjengelig',12,25);tip.style.display='none';chartState[id]=null;return;}
         let lo=percent?Math.max(0,Math.floor(Math.min(...all)/10)*10):0,hi=percent?Math.min(100,Math.ceil(Math.max(...all)/10)*10):Math.max(.1,Math.ceil(Math.max(...all)*1.2*10)/10);if(hi<=lo)hi=lo+(percent?10:.1);
-        const L=38,R=12,T=12,B=28,pw=w-L-R,ph=h-T-B;
+        const L=42,R=12,T=12,B=43,pw=w-L-R,ph=h-T-B,times=clean.flatMap(s=>s.points.map(p=>p.timestamp)),t0=Math.min(...times),t1=Math.max(...times),colors=['#237b52','#e3a12f','#447fc1'];
+        const pxFor=t=>L+(t-t0)/(t1-t0||1)*pw,pyFor=v=>T+(hi-v)/(hi-lo)*ph;
         x.font='11px sans-serif';x.fillStyle='#758179';x.strokeStyle='#e2e8e2';
-        for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(percent?0:1),2,y+4);}
-        const times=series.flatMap(s=>s.points.map(p=>p.timestamp)),t0=Math.min(...times),t1=Math.max(...times),colors=['#237b52','#e3a12f','#447fc1'];
-        series.forEach((s,j)=>{const pts=s.points.slice().sort((a,b)=>a.timestamp-b.timestamp);if(!pts.length)return;x.strokeStyle=colors[j%colors.length];x.lineWidth=2;x.beginPath();pts.forEach((p,i)=>{const px=L+(p.timestamp-t0)/(t1-t0||1)*pw,py=T+(hi-p.value)/(hi-lo)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();});
-        x.fillStyle='#758179';x.fillText(new Date(t0).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),L,h-7);x.fillText(new Date(t1).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),w-R-35,h-7);
-        x.font='12px sans-serif';let lx=L;series.forEach((s,j)=>{if(!s.points.length)return;x.fillStyle=colors[j%colors.length];x.fillRect(lx,h-20,8,8);x.fillStyle='#53645d';x.fillText(s.label,lx+12,h-12);lx+=x.measureText(s.label).width+32;});
+        for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(percent?0:2),2,y+4);}
+        clean.forEach((s,j)=>{const pts=s.points;if(!pts.length)return;x.strokeStyle=colors[j%colors.length];x.lineWidth=2;x.beginPath();pts.forEach((p,i)=>{const px=pxFor(p.timestamp),py=pyFor(p.value);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();});
+        // Date labels spread across the full selected range.
+        x.font='10px sans-serif';x.fillStyle='#758179';
+        for(let i=0;i<Math.min(5,Math.max(2,Math.ceil((t1-t0)/86400000)+1));i++){const t=t0+(t1-t0)*i/(Math.min(5,Math.max(2,Math.ceil((t1-t0)/86400000)+1))-1);const label=new Date(t).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'});const px=pxFor(t);x.fillText(label,Math.max(L,Math.min(w-R-30,px-14)),h-24);}
+        x.font='11px sans-serif';let lx=L;clean.forEach((s,j)=>{if(!s.points.length)return;x.fillStyle=colors[j%colors.length];x.fillRect(lx,h-12,7,7);x.fillStyle='#53645d';x.fillText(s.label,lx+10,h-5);lx+=x.measureText(s.label).width+28;});
+        chartState[id]={clean,w,h,L,R,T,B,pw,ph,t0,t1,lo,hi,percent,colors,pxFor,pyFor};
+        function showAt(clientX){
+          const state=chartState[id];if(!state)return;
+          const rect=c.getBoundingClientRect(),localX=clientX-rect.left,plotX=Math.max(state.L,Math.min(state.w-state.R,localX));
+          const timestamp=state.t0+(plotX-state.L)/(state.pw||1)*(state.t1-state.t0);
+          const lines=[new Date(timestamp).toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})];
+          state.clean.forEach((s,j)=>{if(!s.points.length)return;let nearest=s.points[0];for(const p of s.points){if(Math.abs(p.timestamp-timestamp)<Math.abs(nearest.timestamp-timestamp))nearest=p;}lines.push(s.label+': '+nearest.value.toFixed(state.percent?1:3)+(state.percent?' %':' kWh'));});
+          tip.textContent=lines.join('\n');tip.style.display='block';
+          const xPos=Math.max(8,Math.min(state.w-190,plotX+10));tip.style.left=xPos+'px';tip.style.top='.5rem';
+          x.save();x.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);x.clearRect(0,0,state.w,state.h);
+          x.restore();
+          // Draw a vertical crosshair and dots on the nearest real values.
+          x.save();x.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);x.strokeStyle='#596a61';x.setLineDash([4,3]);x.beginPath();x.moveTo(plotX,state.T);x.lineTo(plotX,state.h-state.B);x.stroke();x.setLineDash([]);
+          state.clean.forEach((s,j)=>{if(!s.points.length)return;let nearest=s.points[0];for(const p of s.points){if(Math.abs(p.timestamp-timestamp)<Math.abs(nearest.timestamp-timestamp))nearest=p;}x.fillStyle=state.colors[j%state.colors.length];x.beginPath();x.arc(state.pxFor(nearest.timestamp),state.pyFor(nearest.value),4,0,Math.PI*2);x.fill();});
+          x.restore();
+        }
+        c.onpointermove=e=>{if(e.pointerType==='mouse')showAt(e.clientX);};
+        c.onpointerdown=e=>{showAt(e.clientX);};
+        c.onpointerleave=()=>{tip.style.display='none';};
       }
       async function load(days){
         buttons.forEach(b=>b.classList.toggle('active',Number(b.dataset.days)===days));note.textContent='Henter historikk …';
