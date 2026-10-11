@@ -10,6 +10,8 @@ COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY backend/app /app/app
+COPY backend/pytest.ini /app/pytest.ini
+COPY tests /app/tests
 
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/media \
