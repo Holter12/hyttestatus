@@ -73,6 +73,35 @@
         <p class="subtle">Hyttestatus hentet svaret: {{ status.generated_at }}. Dette er hentetidspunktet, ikke nødvendigvis tidspunktet for siste måling på GX.</p>
       </section>
     </div>
+    {% if status.tank_level_percent is not none or status.tank_remaining_liters is not none %}
+    <section class="card history" aria-labelledby="tank-heading">
+      <h2 id="tank-heading">Tankstatus</h2>
+      <div class="metrics">
+        <div class="metric">
+          <div class="label">Tanknivå</div>
+          <div class="value">{{ '%.0f'|format(status.tank_level_percent) if status.tank_level_percent is not none else '—' }} <span class="unit">%</span></div>
+          {% if status.tank_level_percent is not none %}
+          <div style="height:.55rem;background:#e6ebe6;border-radius:999px;overflow:hidden;margin-top:.8rem" role="progressbar" aria-label="Tanknivå" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ '%.0f'|format(status.tank_level_percent) }}">
+            <div style="height:100%;width:{{ [0, [status.tank_level_percent, 100]|min]|max }}%;background:#237b52;border-radius:999px"></div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="metric">
+          <div class="label">Mengde igjen</div>
+          <div class="value">{{ '%.0f'|format(status.tank_remaining_liters) if status.tank_remaining_liters is not none else '—' }} <span class="unit">liter</span></div>
+        </div>
+        <div class="metric">
+          <div class="label">Tankkapasitet</div>
+          <div class="value">{{ '%.0f'|format(status.tank_capacity_liters) if status.tank_capacity_liters is not none else '—' }} <span class="unit">liter</span></div>
+        </div>
+        <div class="metric">
+          <div class="label">Status</div>
+          <div class="value" style="font-size:1.3rem">{{ status.tank_status or 'Ukjent' }}</div>
+        </div>
+      </div>
+      <p class="subtle">Tankdata fra Victron VRM. Verdier vises bare når de er tilgjengelige.</p>
+    </section>
+    {% endif %}
     <section class="card history" id="energy-history">
       <h2>Historikk fra Victron VRM</h2>
       <p class="subtle">Velg periode. Manglende målinger behandles som manglende data, ikke som null.</p>
