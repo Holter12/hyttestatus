@@ -216,9 +216,10 @@
             let nearest=s.points[0],nearestX=state.pxFor(nearest.timestamp);
             for(const p of s.points){const pointX=state.pxFor(p.timestamp);if(Math.abs(pointX-plotX)<Math.abs(nearestX-plotX)){nearest=p;nearestX=pointX;}}
             if(!state.percent){
-              const intervalEnd=new Date(nearest.timestamp);
-              intervalEnd.setHours(intervalEnd.getHours()+1);
-              const startLabel=new Date(nearest.timestamp).toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+              const intervalStart=new Date(nearest.timestamp);
+              intervalStart.setMinutes(0,0,0);
+              const intervalEnd=new Date(intervalStart.getTime()+60*60*1000);
+              const startLabel=intervalStart.toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
               const endLabel=intervalEnd.toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'});
               lines.push(startLabel+'–'+endLabel);
               lines.push(s.label+': '+nearest.value.toFixed(1)+' Ah-ekv. (ved 12 V)');
