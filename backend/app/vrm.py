@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -73,13 +75,47 @@ def _find_value(records: list[dict[str, Any]], codes: tuple[str, ...]) -> float 
     return None
 
 
+def _number(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+        return parsed if parsed >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _today_energy_totals() -> tuple[float | None, float | None]:
+    """Return today's kWh totals, bounded by midnight in the configured site timezone."""
+    timezone_name = os.getenv("TIMEZONE", "Europe/Oslo")
+    try:
+        site_tz = ZoneInfo(timezone_name)
+    except Exception:
+        site_tz = ZoneInfo("Europe/Oslo")
+    now = datetime.now(site_tz)
+    midnight = datetime.combine(now.date(), time.min, tzinfo=site_tz)
+    start = int(midnight.timestamp())
+    end = int((now + timedelta(minutes=1)).timestamp())
+    payload = _request("stats", {
+        "type": "kwh",
+        "interval": "days",
+        "start": start,
+        "end": end,
+    })
+    totals = payload.get("totals", {})
+    if not isinstance(totals, dict):
+        return None, None
+    # VRM's kWh statistics use Pb for solar yield and Pc for consumption.
+    # Return None for missing/false/unrecognized totals rather than fabricate zero.
+    return _number(totals.get("Pb")), _number(totals.get("Pc"))
+
+
 def get_status() -> dict[str, Any]:
     """Read current diagnostic values and today's energy totals from VRM."""
     diagnostics_payload = _request("diagnostics", {"count": 1000})
     diagnostics = _records(diagnostics_payload)
     result: dict[str, Any] = {
         "data_status": "connected",
-        "message": "Tilkoblet Victron VRM.",
+        "message": "Data hentet fra hyttas GX via Victron VRM.",
+        "data_source": "Victron GX via Victron VRM API",
         "battery_soc_percent": _find_value(diagnostics, ("SOC",)),
         "battery_voltage_v": _find_value(diagnostics, ("bv", "V", "voltage")),
         "solar_energy_today_kwh": None,
@@ -89,6 +125,11 @@ def get_status() -> dict[str, Any]:
             if isinstance(item, dict) and item.get("code")
         }),
     }
-    # Energy statistics can have different record shapes across VRM installations.
-    # Keep energy values unavailable until the returned totals can be mapped reliably.
+    try:
+        solar, consumption = _today_energy_totals()
+        result["solar_energy_today_kwh"] = solar
+        result["load_energy_today_kwh"] = consumption
+    except VRMError:
+        # Live battery readings remain useful if the statistics endpoint is unavailable.
+        result["message"] = "Batteridata hentet fra hyttas GX via VRM; dagens energistatistikk er foreløpig utilgjengelig."
     return result
