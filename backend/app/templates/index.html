@@ -16,7 +16,7 @@
     main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem 3rem; }
     .statusline { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; color: #53645d; font-size: .9rem; }
     .pill { display: inline-flex; align-items: center; gap: .45rem; border-radius: 999px; background: #e5ede7; color: #315845; padding: .4rem .75rem; font-size: .82rem; }
-    .dot { width: .5rem; height: .5rem; border-radius: 50%; background: #bd842d; }
+    .dot { width: .5rem; height: .5rem; border-radius: 50%; background: {% if status.data_status == 'connected' %}#26834a{% elif status.data_status == 'error' %}#bd493d{% else %}#bd842d{% endif %}; }
     .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .9fr); gap: 1rem; }
     .card { background: #fff; border: 1px solid #e1e7e1; border-radius: 1rem; padding: 1.2rem; box-shadow: 0 3px 14px rgb(21 45 32 / 4%); }
     .card h2 { font-size: 1.1rem; margin: 0 0 .9rem; }
@@ -45,7 +45,11 @@
   <main>
     <div class="statusline">
       <span>Velkommen til hytteportalen</span>
-      <span class="pill"><span class="dot"></span> Oppstart – integrasjoner ikke koblet til</span>
+      <span class="pill"><span class="dot"></span>
+        {% if status.data_status == 'connected' %}Tilkoblet Victron VRM
+        {% elif status.data_status == 'error' %}VRM-feil
+        {% else %}Oppstart – VRM ikke konfigurert{% endif %}
+      </span>
     </div>
     <div class="grid">
       <section class="card">
@@ -58,12 +62,13 @@
       <section class="card">
         <h2>Strømstatus</h2>
         <div class="metrics">
-          <div class="metric"><div class="label">Batteri</div><div class="value">— <span class="unit">%</span></div></div>
-          <div class="metric"><div class="label">Batterispenning</div><div class="value">— <span class="unit">V</span></div></div>
-          <div class="metric"><div class="label">Solproduksjon i dag</div><div class="value">— <span class="unit">kWh</span></div></div>
-          <div class="metric"><div class="label">Forbruk i dag</div><div class="value">— <span class="unit">kWh</span></div></div>
+          <div class="metric"><div class="label">Batteri</div><div class="value">{{ '%.0f'|format(status.battery_soc_percent) if status.battery_soc_percent is not none else '—' }} <span class="unit">%</span></div></div>
+          <div class="metric"><div class="label">Batterispenning</div><div class="value">{{ '%.1f'|format(status.battery_voltage_v) if status.battery_voltage_v is not none else '—' }} <span class="unit">V</span></div></div>
+          <div class="metric"><div class="label">Solproduksjon i dag</div><div class="value">{{ '%.2f'|format(status.solar_energy_today_kwh) if status.solar_energy_today_kwh is not none else '—' }} <span class="unit">kWh</span></div></div>
+          <div class="metric"><div class="label">Forbruk i dag</div><div class="value">{{ '%.2f'|format(status.load_energy_today_kwh) if status.load_energy_today_kwh is not none else '—' }} <span class="unit">kWh</span></div></div>
         </div>
-        <div class="note">VRM er ikke konfigurert. Ingen verdier vises før tilkobling; gamle målinger vil senere merkes med tidspunkt.</div>
+        <div class="note">{{ status.message }} Ingen verdier som ikke kan bekreftes fra VRM blir vist.</div>
+        <p class="subtle">Kontrollert: {{ status.generated_at }}</p>
       </section>
     </div>
     <section class="card history">
