@@ -229,6 +229,75 @@ def get_tank_history(days: int = 14) -> dict[str, Any]:
         "note": None if points else "VRM har ikke returnert historiske tanknivåer for perioden.",
     }
 
+
+def get_advanced_status() -> dict[str, Any]:
+    """Return selected live diagnostic fields for battery, MPPT controllers and tank."""
+    diagnostics = _records(_request("diagnostics", {"count": 1000}))
+
+    def device(instance: int, title: str) -> dict[str, Any]:
+        items = [
+            item for item in diagnostics
+            if isinstance(item, dict) and str(item.get("instance")) == str(instance)
+        ]
+        def value(codes: tuple[str, ...]) -> float | None:
+            return _find_value(items, codes)
+        def label(codes: tuple[str, ...]) -> str | None:
+            for item in items:
+                if item.get("code") in codes:
+                    text = item.get("formattedValue")
+                    if text is not None:
+                        return str(text)
+            return None
+        return {
+            "title": title,
+            "instance": instance,
+            "available": bool(items),
+            "items": items,
+            "voltage_v": value(("bv", "V", "ScV", "PVV")),
+            "current_a": value(("I", "ScI", "PVc")),
+            "power_w": value(("PVP", "Pdc", "PPV")),
+            "temperature_c": value(("ScT", "T")),
+            "level_percent": value(("tl",)),
+            "remaining_liters": value(("tr",)),
+            "capacity_liters": value(("tc",)),
+            "status": label(("ts",)),
+        }
+
+    battery_items = [
+        item for item in diagnostics
+        if isinstance(item, dict) and item.get("code") in ("SOC", "bv", "V", "I", "TTG", "CE", "ca")
+    ]
+    battery = {
+        "soc_percent": _find_value(battery_items, ("SOC",)),
+        "voltage_v": _find_value(battery_items, ("bv", "V")),
+        "current_a": _find_value(battery_items, ("I",)),
+        "time_to_go_hours": _find_value(battery_items, ("TTG",)),
+        "consumed_ah": _find_value(battery_items, ("CE",)),
+        "capacity_ah": _find_value(battery_items, ("ca",)),
+    }
+    # Keep the complete diagnostic fields for identified devices. Raw records are
+    # reduced to safe display fields; API credentials and installation data are never included.
+    def display_items(instance: int) -> list[dict[str, Any]]:
+        result = []
+        for item in diagnostics:
+            if not isinstance(item, dict) or str(item.get("instance")) != str(instance):
+                continue
+            result.append({
+                "code": item.get("code"),
+                "description": item.get("description"),
+                "value": item.get("formattedValue", item.get("rawValue", item.get("value"))),
+            })
+        return result
+
+    return {
+        "data_source": "Victron GX via Victron VRM API",
+        "battery": battery,
+        "mppt1": {**device(30, "EPEVER Tracer 2210AN"), "items": display_items(30)},
+        "mppt2": {**device(277, "Victron MPPT"), "items": display_items(277)},
+        "tank": {**device(20, "Tankmåler"), "items": display_items(20)},
+    }
+
+
 def get_status() -> dict[str, Any]:
     """Read current diagnostic values and today's energy totals from VRM."""
     diagnostics_payload = _request("diagnostics", {"count": 1000})
