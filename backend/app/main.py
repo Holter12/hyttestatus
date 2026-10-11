@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_status as get_vrm_status
+from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_advanced_status as get_vrm_advanced_status, get_status as get_vrm_status
 
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
@@ -82,6 +82,32 @@ def tank_history(days: int = Query(default=14, ge=7, le=30)) -> dict[str, object
         return get_vrm_tank_history(days)
     except VRMError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/advanced")
+def advanced_status() -> dict[str, object]:
+    """Return live values for the advanced energy page."""
+    if not vrm_configured():
+        raise HTTPException(status_code=503, detail="VRM er ikke konfigurert.")
+    try:
+        return get_vrm_advanced_status()
+    except VRMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/advanced", response_class=HTMLResponse)
+def advanced_dashboard(request: Request) -> HTMLResponse:
+    try:
+        payload = get_vrm_advanced_status() if vrm_configured() else None
+        error = None
+    except VRMError as exc:
+        payload, error = None, str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="advanced.html",
+        context={"location_name": LOCATION_NAME, "year": datetime.now().year,
+                 "advanced": payload, "error": error},
+    )
 
 @app.get("/api/vrm/check")
 def vrm_check() -> dict[str, object]:
