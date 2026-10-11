@@ -162,6 +162,73 @@ def get_history(days: int = 14) -> dict[str, Any]:
     }
 
 
+
+def get_tank_history(days: int = 14) -> dict[str, Any]:
+    """Return tank level history in liters for a recent period, if VRM has logged it."""
+    if days < 7 or days > 30:
+        raise VRMError("Historikkperioden må være mellom 7 og 30 dager.")
+    timezone_name = os.getenv("TIMEZONE", "Europe/Oslo")
+    try:
+        site_tz = ZoneInfo(timezone_name)
+    except Exception:
+        site_tz = ZoneInfo("Europe/Oslo")
+    now = datetime.now(site_tz)
+    start = int((now - timedelta(days=days)).timestamp())
+    end = int(now.timestamp())
+
+    diagnostics = _records(_request("diagnostics", {"count": 1000}))
+    tank_records = [
+        item for item in diagnostics
+        if isinstance(item, dict) and item.get("instance") == 20
+    ]
+    capacity_m3 = _find_value(tank_records, ("tc",))
+    capacity_liters = capacity_m3 * 1000 if capacity_m3 is not None else None
+
+    payload = _request("stats", [
+        ("type", "custom"),
+        ("interval", "hours"),
+        ("start", str(start)),
+        ("end", str(end)),
+        ("attributeCodes[]", "tl"),
+    ])
+    records = payload.get("records", {})
+    raw_series = records.get("tl") if isinstance(records, dict) else None
+    points: list[dict[str, float | int]] = []
+    if isinstance(raw_series, list):
+        for item in raw_series:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            try:
+                timestamp = int(item[0])
+                level = float(item[1])
+            except (TypeError, ValueError):
+                continue
+            if 0 <= level <= 100:
+                points.append({
+                    "timestamp": timestamp,
+                    "level_percent": level,
+                    "liters": level * capacity_liters / 100 if capacity_liters is not None else 0,
+                })
+    points.sort(key=lambda point: point["timestamp"])
+    first = points[0] if points else None
+    last = points[-1] if points else None
+    difference = (
+        float(first["liters"]) - float(last["liters"])
+        if first is not None and last is not None and capacity_liters is not None
+        else None
+    )
+    return {
+        "days": days,
+        "timezone": timezone_name,
+        "capacity_liters": capacity_liters,
+        "points": points,
+        "counts": len(points),
+        "start_liters": first["liters"] if first else None,
+        "end_liters": last["liters"] if last else None,
+        "consumption_liters": difference,
+        "note": None if points else "VRM har ikke returnert historiske tanknivåer for perioden.",
+    }
+
 def get_status() -> dict[str, Any]:
     """Read current diagnostic values and today's energy totals from VRM."""
     diagnostics_payload = _request("diagnostics", {"count": 1000})
