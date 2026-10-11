@@ -8,6 +8,16 @@ A remote cabin status portal combining daily camera images, image history, and V
 **Deployment target:** Unraid with Docker Compose  
 **Initial installation:** one cabin with a Victron GX system and limited/periodic Starlink connectivity
 
+## Current repository contents
+
+- Initial responsive dashboard page with clearly marked empty/demo states.
+- FastAPI application and health endpoint.
+- Docker Compose skeleton for web, worker, and PostgreSQL.
+- Environment template and gitignore.
+- Architecture, security, VRM-integration, MVP, and Unraid deployment notes.
+
+**Important:** this is a development skeleton. Authentication, actual VRM synchronization, image ingestion, database models/migrations, and retention are not implemented. Do not expose it publicly or put real credentials/images into it yet.
+
 ## MVP goals
 
 - Show the latest successfully received cabin image and its capture/receipt timestamps.
@@ -32,23 +42,44 @@ A remote cabin status portal combining daily camera images, image history, and V
 
 The exact image-ingestion method and external access path are still to be decided. Avoid exposing Unraid administration, the camera, or the VRM API token directly to the public internet.
 
-## Suggested repository layout
+## Repository layout
 
 ```text
 hyttestatus/
 ├── backend/
-├── frontend/
-├── worker/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── worker.py
+│   │   └── templates/
+│   ├── Dockerfile
+│   └── requirements.txt
 ├── deploy/
 │   └── docker-compose.yml
 ├── docs/
 │   ├── architecture.md
 │   ├── security.md
-│   └── vrm-integration.md
+│   ├── vrm-integration.md
+│   ├── mvp-plan.md
+│   └── unraid-deployment.md
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
+
+## Unraid quick start
+
+1. Clone the repository on the Unraid host or a suitable development machine.
+2. Copy `.env.example` to `.env` and choose strong, unique passwords/secrets.
+3. Set `HYTTESTATUS_DB_PATH` and `HYTTESTATUS_MEDIA_PATH` to persistent Unraid directories.
+4. Run:
+
+   ```sh
+   docker compose -f deploy/docker-compose.yml up -d --build
+   ```
+
+5. Check `http://127.0.0.1:8088/health` from the host.
+
+See [docs/unraid-deployment.md](docs/unraid-deployment.md) before deploying.
 
 ## Development principles
 
@@ -58,15 +89,14 @@ hyttestatus/
 4. Keep camera/media access separate from installer-only telemetry.
 5. Do not commit credentials, tokens, private images, or production configuration to Git.
 
-## First milestones
+## Milestones
 
-1. Confirm repository and deployment assumptions.
-2. Add a working Compose skeleton and health checks.
-3. Implement a responsive dashboard with clearly labelled demo data.
-4. Add secure configuration and user roles.
-5. Integrate VRM API data and local persistence.
-6. Add image upload/synchronization and date-based gallery.
-7. Test offline/retry behaviour and backup/restore.
+1. [x] Initialize repository documentation, architecture, Compose skeleton and dashboard prototype.
+2. [ ] Confirm image source and upload method.
+3. [ ] Add authentication and role-based access before external use.
+4. [ ] Integrate VRM data and local persistence.
+5. [ ] Add image upload/synchronization and date-based gallery.
+6. [ ] Test offline/retry behaviour, backups, and restore.
 
 ## Configuration
 
