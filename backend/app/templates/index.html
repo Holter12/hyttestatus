@@ -210,8 +210,23 @@
           const state=chartState[id];if(!state)return;
           const rect=c.getBoundingClientRect(),plotX=Math.max(state.L,Math.min(state.w-state.R,clientX-rect.left));
           const timestamp=state.t0+(plotX-state.L)/(state.pw||1)*(state.t1-state.t0);
-          const lines=[new Date(timestamp).toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})];
-          state.clean.forEach(s=>{if(!s.points.length)return;let nearest=s.points[0];for(const p of s.points){if(Math.abs(p.timestamp-timestamp)<Math.abs(nearest.timestamp-timestamp))nearest=p;}lines.push(s.label+': '+nearest.value.toFixed(state.percent?1:1)+(state.percent?' %':' Ah (ved 12 V)'));});
+          const lines=[];
+          state.clean.forEach(s=>{
+            if(!s.points.length)return;
+            let nearest=s.points[0],nearestX=state.pxFor(nearest.timestamp);
+            for(const p of s.points){const pointX=state.pxFor(p.timestamp);if(Math.abs(pointX-plotX)<Math.abs(nearestX-plotX)){nearest=p;nearestX=pointX;}}
+            if(!state.percent){
+              const intervalEnd=new Date(nearest.timestamp);
+              intervalEnd.setHours(intervalEnd.getHours()+1);
+              const startLabel=new Date(nearest.timestamp).toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+              const endLabel=intervalEnd.toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'});
+              lines.push(startLabel+'–'+endLabel);
+              lines.push(s.label+': '+nearest.value.toFixed(1)+' Ah-ekv. (ved 12 V)');
+            }else{
+              lines.push(new Date(nearest.timestamp).toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}));
+              lines.push(s.label+': '+nearest.value.toFixed(1)+' %');
+            }
+          });
           tip.textContent=lines.join('\n');tip.style.display='block';tip.style.left=Math.max(8,Math.min(state.w-190,plotX+10))+'px';tip.style.top='.5rem';
         }
         c.onpointermove=e=>{if(e.pointerType==='mouse')showAt(e.clientX);};c.onpointerdown=e=>showAt(e.clientX);c.onpointerleave=()=>{tip.style.display='none';};
