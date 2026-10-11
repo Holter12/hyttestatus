@@ -9,6 +9,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from app.vrm import VRMError, configured as vrm_configured, get_status as get_vrm_status
+
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/app/media"))
@@ -16,12 +18,35 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/app/media"))
 app = FastAPI(
     title=APP_NAME,
     description="Cabin status dashboard — initial single-location MVP",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 templates = Jinja2Templates(directory="/app/app/templates")
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT), check_dir=False), name="media")
+
+
+def current_status() -> dict[str, object]:
+    payload: dict[str, object] = {
+        "location": LOCATION_NAME,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "data_status": "unconfigured",
+        "message": "VRM er ikke konfigurert.",
+        "battery_soc_percent": None,
+        "battery_voltage_v": None,
+        "solar_energy_today_kwh": None,
+        "load_energy_today_kwh": None,
+        "latest_image": None,
+    }
+    if not vrm_configured():
+        return payload
+    try:
+        payload.update(get_vrm_status())
+    except VRMError as exc:
+        payload["data_status"] = "error"
+        payload["message"] = str(exc)
+    payload["generated_at"] = datetime.now(timezone.utc).isoformat()
+    return payload
 
 
 @app.get("/health")
@@ -31,27 +56,43 @@ def health() -> dict[str, str]:
 
 @app.get("/api/status")
 def status() -> dict[str, object]:
-    """Starter payload. VRM integration replaces unavailable values later."""
-    return {
-        "location": LOCATION_NAME,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "data_status": "demo",
-        "message": "VRM integration not configured yet",
-        "battery_soc_percent": None,
-        "battery_voltage_v": None,
-        "solar_energy_today_kwh": None,
-        "load_energy_today_kwh": None,
-        "latest_image": None,
-    }
+    """Return live VRM status, or a clear unavailable state without fake values."""
+    return current_status()
+
+
+@app.get("/api/vrm/check")
+def vrm_check() -> dict[str, object]:
+    """Safe connection test: never returns token, installation ID, or raw API data."""
+    if not vrm_configured():
+        return {"configured": False, "connected": False, "message": "VRM-verdier mangler i miljøet."}
+    try:
+        result = get_vrm_status()
+        return {
+            "configured": True,
+            "connected": True,
+            "message": "Kontakt med Victron VRM fungerer.",
+            "available_fields": [
+                name for name in (
+                    "battery_soc_percent",
+                    "battery_voltage_v",
+                    "solar_energy_today_kwh",
+                    "load_energy_today_kwh",
+                ) if result.get(name) is not None
+            ],
+        }
+    except VRMError as exc:
+        return {"configured": True, "connected": False, "message": str(exc)}
 
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request) -> HTMLResponse:
+    payload = current_status()
     return templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
             "location_name": LOCATION_NAME,
             "year": datetime.now().year,
+            "status": payload,
         },
     )
