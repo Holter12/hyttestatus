@@ -36,6 +36,7 @@ def current_status() -> dict[str, object]:
         "battery_voltage_v": None,
         "solar_energy_today_kwh": None,
         "load_energy_today_kwh": None,
+        "battery_to_consumers_today_kwh": None,
         "latest_image": None,
     }
     if not vrm_configured():
@@ -77,6 +78,7 @@ def vrm_check() -> dict[str, object]:
                     "battery_voltage_v",
                     "solar_energy_today_kwh",
                     "load_energy_today_kwh",
+                    "battery_to_consumers_today_kwh",
                 ) if result.get(name) is not None
             ],
         }
