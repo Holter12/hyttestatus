@@ -175,6 +175,38 @@ def get_status() -> dict[str, Any]:
         "solar_energy_today_kwh": None,
         "load_energy_today_kwh": None,
         "battery_to_consumers_today_kwh": None,
+        "tank_level_percent": _find_value(
+            [item for item in diagnostics if isinstance(item, dict) and item.get("instance") == 20],
+            ("tl",),
+        ),
+        "tank_remaining_liters": (
+            _find_value(
+                [item for item in diagnostics if isinstance(item, dict) and item.get("instance") == 20],
+                ("tr",),
+            ) * 1000
+            if _find_value(
+                [item for item in diagnostics if isinstance(item, dict) and item.get("instance") == 20],
+                ("tr",),
+            ) is not None else None
+        ),
+        "tank_capacity_liters": (
+            _find_value(
+                [item for item in diagnostics if isinstance(item, dict) and item.get("instance") == 20],
+                ("tc",),
+            ) * 1000
+            if _find_value(
+                [item for item in diagnostics if isinstance(item, dict) and item.get("instance") == 20],
+                ("tc",),
+            ) is not None else None
+        ),
+        "tank_status": next(
+            (
+                str(item.get("formattedValue") or item.get("value"))
+                for item in diagnostics
+                if isinstance(item, dict) and item.get("instance") == 20 and item.get("code") == "ts"
+            ),
+            None,
+        ),
         "vrm_diagnostic_codes": sorted({
             str(item.get("code")) for item in diagnostics
             if isinstance(item, dict) and item.get("code")
