@@ -84,7 +84,7 @@ def _number(value: Any) -> float | None:
 
 
 def _today_energy_totals() -> tuple[float | None, float | None]:
-    """Return today's kWh totals, bounded by midnight in the configured site timezone."""
+    """Return confirmed solar yield and battery-to-consumer energy for today."""
     timezone_name = os.getenv("TIMEZONE", "Europe/Oslo")
     try:
         site_tz = ZoneInfo(timezone_name)
@@ -94,18 +94,19 @@ def _today_energy_totals() -> tuple[float | None, float | None]:
     midnight = datetime.combine(now.date(), time.min, tzinfo=site_tz)
     start = int(midnight.timestamp())
     end = int((now + timedelta(minutes=1)).timestamp())
-    payload = _request("stats", {
-        "type": "kwh",
-        "interval": "days",
-        "start": start,
-        "end": end,
-    })
-    totals = payload.get("totals", {})
-    if not isinstance(totals, dict):
-        return None, None
-    # VRM's kWh statistics use Pb for solar yield and Pc for consumption.
-    # Return None for missing/false/unrecognized totals rather than fabricate zero.
-    return _number(totals.get("Pb")), _number(totals.get("Pc"))
+    common = {"interval": "days", "start": start, "end": end}
+    solar_payload = _request("stats", {"type": "solar_yield", **common})
+    consumption_payload = _request("stats", {"type": "consumption", **common})
+
+    solar_totals = solar_payload.get("totals", {})
+    consumption_totals = consumption_payload.get("totals", {})
+    solar = _number(solar_totals.get("Pt")) if isinstance(solar_totals, dict) else None
+    battery_to_consumers = (
+        _number(consumption_totals.get("Bc"))
+        if isinstance(consumption_totals, dict) else None
+    )
+    # VRM returns false for unavailable series. Keep these as None, never as 0.
+    return solar, battery_to_consumers
 
 
 def get_status() -> dict[str, Any]:
@@ -120,15 +121,16 @@ def get_status() -> dict[str, Any]:
         "battery_voltage_v": _find_value(diagnostics, ("bv", "V", "voltage")),
         "solar_energy_today_kwh": None,
         "load_energy_today_kwh": None,
+        "battery_to_consumers_today_kwh": None,
         "vrm_diagnostic_codes": sorted({
             str(item.get("code")) for item in diagnostics
             if isinstance(item, dict) and item.get("code")
         }),
     }
     try:
-        solar, consumption = _today_energy_totals()
+        solar, battery_to_consumers = _today_energy_totals()
         result["solar_energy_today_kwh"] = solar
-        result["load_energy_today_kwh"] = consumption
+        result["battery_to_consumers_today_kwh"] = battery_to_consumers
     except VRMError:
         # Live battery readings remain useful if the statistics endpoint is unavailable.
         result["message"] = "Batteridata hentet fra hyttas GX via VRM; dagens energistatistikk er foreløpig utilgjengelig."
