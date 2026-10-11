@@ -204,7 +204,7 @@
         for(let t=new Date(t0);t.getTime()<=t1;){const day=Math.floor(t.getTime()/86400000);if(lastLabelDay<0||day-lastLabelDay>=labelStep){dateLabels.push({t:t.getTime(),label:t.toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'})});lastLabelDay=day;}t.setDate(t.getDate()+1);t.setHours(0,0,0,0);}
         dateLabels.push({t:t1,label:new Date(t1).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'})});
         x.font='10px sans-serif';x.fillStyle='#758179';dateLabels.forEach(({t,label})=>{const px=pxFor(t);x.fillText(label,Math.max(L,Math.min(w-R-27,px-12)),h-22);});
-        clean.forEach((s,j)=>{const pts=s.points;if(!pts.length)return;x.strokeStyle=colors[j%colors.length];x.lineWidth=2;let previous=null,started=false;pts.forEach(p=>{if(previous&&p.timestamp-previous.timestamp>2*3600*1000){if(started)x.stroke();x.beginPath();started=false;}const px=pxFor(p.timestamp),py=pyFor(p.value);if(!started){x.beginPath();x.moveTo(px,py);started=true;}else{x.lineTo(px,py);}previous=p;});if(started)x.stroke();});
+        clean.forEach((s,j)=>{const pts=s.points;if(!pts.length)return;x.fillStyle=colors[j%colors.length];const slot=pw/Math.max(1,pts.length);const barW=Math.max(2,Math.min(14,slot*.68));pts.forEach(p=>{const px=pxFor(p.timestamp),py=pyFor(p.value);const barH=Math.max(1,T+ph-py);x.fillRect(px-barW/2,py,barW,barH);});});
         chartState[id]={clean,w,h,L,R,T,B,pw,ph,t0,t1,lo,hi,percent,colors,pxFor,pyFor};
         function showAt(clientX){
           const state=chartState[id];if(!state)return;
