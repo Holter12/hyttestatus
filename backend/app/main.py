@@ -4,12 +4,12 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.vrm import VRMError, configured as vrm_configured, get_status as get_vrm_status
+from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_status as get_vrm_status
 
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
@@ -59,6 +59,17 @@ def health() -> dict[str, str]:
 def status() -> dict[str, object]:
     """Return live VRM status, or a clear unavailable state without fake values."""
     return current_status()
+
+
+@app.get("/api/history")
+def history(days: int = Query(default=14, ge=7, le=30)) -> dict[str, object]:
+    """Return historical VRM series for 7–30 days."""
+    if not vrm_configured():
+        raise HTTPException(status_code=503, detail="VRM er ikke konfigurert.")
+    try:
+        return get_vrm_history(days)
+    except VRMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.get("/api/vrm/check")
