@@ -68,7 +68,8 @@
           <div class="metric"><div class="label">Forbruk i dag</div><div class="value">{{ '%.2f'|format(status.load_energy_today_kwh) if status.load_energy_today_kwh is not none else '—' }} <span class="unit">kWh</span></div></div>
         </div>
         <div class="note">{{ status.message }} Ingen verdier som ikke kan bekreftes fra VRM blir vist.</div>
-        <p class="subtle">Kontrollert: {{ status.generated_at }}</p>
+        {% if status.data_source %}<p class="subtle">Datakilde: {{ status.data_source }}. Dette er data som GX-en på hytta har sendt til Victron VRM; det er ikke en direkte tilkobling fra denne nettsiden til GX.</p>{% endif %}
+        <p class="subtle">Hyttestatus hentet svaret: {{ status.generated_at }}. Dette er hentetidspunktet, ikke nødvendigvis tidspunktet for siste måling på GX.</p>
       </section>
     </div>
     <section class="card history">
