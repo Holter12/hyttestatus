@@ -100,6 +100,16 @@
         </div>
       </div>
       <p class="subtle">Tankdata fra Victron VRM. Verdier vises bare når de er tilgjengelige.</p>
+      <h3>Dieselforbruk over tid</h3>
+      <p class="subtle">Historikk basert på tanknivå. Forbruk beregnes som liter ved periodens start minus liter ved periodens slutt. Påfylling kan gi negativ differanse.</p>
+      <div class="periods" id="tank-periods"><button type="button" data-days="7">7 dager</button><button type="button" data-days="14" class="active">14 dager</button><button type="button" data-days="30">30 dager</button></div>
+      <div class="metrics">
+        <div class="metric"><div class="label">Liter ved start</div><div class="value" id="tank-start">—</div></div>
+        <div class="metric"><div class="label">Liter nå / siste måling</div><div class="value" id="tank-end">—</div></div>
+        <div class="metric"><div class="label">Differanse / estimert forbruk</div><div class="value" id="tank-diff">—</div></div>
+      </div>
+      <div class="chart-wrap"><canvas id="tank-history-chart" height="190" aria-label="Tankinnhold i liter over tid" role="img"></canvas></div>
+      <p class="subtle" id="tank-history-message" aria-live="polite">Henter tankhistorikk …</p>
     </section>
     {% endif %}
     <section class="card history" id="energy-history">
@@ -131,6 +141,47 @@
       #energy-history .periods button:focus-visible{outline:3px solid #e3a12f;outline-offset:2px}
       @media(max-width:600px){ #energy-history .metric{min-height:95px;padding:.75rem}#energy-history .metric .value{font-size:1.35rem}#energy-history h3{font-size:1rem}}
     </style>
+    <script>
+    (() => {
+      const tankButtons=[...document.querySelectorAll('#tank-periods button')];
+      const tankNote=document.getElementById('tank-history-message');
+      const fmtLiters=v=>Number.isFinite(v)?v.toLocaleString('no-NO',{maximumFractionDigits:1})+' liter':'—';
+      async function loadTankHistory(days){
+        tankButtons.forEach(b=>b.classList.toggle('active',Number(b.dataset.days)===days));
+        tankNote.textContent='Henter tankhistorikk …';
+        try{
+          const r=await fetch('/api/tank-history?days='+days),data=await r.json();
+          if(!r.ok)throw Error(data.detail||'Feil ved henting');
+          const pts=(data.points||[]).filter(p=>Number.isFinite(p.timestamp)&&Number.isFinite(p.liters)).sort((a,b)=>a.timestamp-b.timestamp);
+          document.getElementById('tank-start').textContent=fmtLiters(data.start_liters);
+          document.getElementById('tank-end').textContent=fmtLiters(data.end_liters);
+          document.getElementById('tank-diff').textContent=data.consumption_liters===null||data.consumption_liters===undefined?'—':fmtLiters(data.consumption_liters);
+          const c=document.getElementById('tank-history-chart'),w=Math.max(300,c.clientWidth||600),h=190,d=window.devicePixelRatio||1;
+          c.width=w*d;c.height=h*d;c.style.height=h+'px';
+          const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);
+          if(pts.length<2){
+            x.fillStyle='#758179';x.font='13px sans-serif';x.fillText(pts.length?'Bare ett målepunkt – ikke nok til å vise utvikling':'Ingen historiske tankmålinger tilgjengelig',12,25);
+          }else{
+            const values=pts.map(p=>p.liters),lo=Math.max(0,Math.floor(Math.min(...values)/10)*10),hi=Math.max(lo+10,Math.ceil(Math.max(...values)/10)*10),L=42,R=12,T=12,B=34,pw=w-L-R,ph=h-T-B,t0=pts[0].timestamp,t1=pts[pts.length-1].timestamp;
+            const px=t=>L+(t-t0)/(t1-t0||1)*pw,py=v=>T+(hi-v)/(hi-lo)*ph;
+            x.font='11px sans-serif';x.fillStyle='#758179';x.strokeStyle='#e2e8e2';
+            for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(0),2,y+4);}
+            x.strokeStyle='#237b52';x.lineWidth=2;x.beginPath();
+            pts.forEach((p,i)=>{if(i===0)x.moveTo(px(p.timestamp),py(p.liters));else x.lineTo(px(p.timestamp),py(p.liters));});x.stroke();
+            [pts[0],pts[pts.length-1]].forEach(p=>{x.fillStyle='#237b52';x.beginPath();x.arc(px(p.timestamp),py(p.liters),3,0,Math.PI*2);x.fill();});
+            x.fillStyle='#758179';x.font='10px sans-serif';
+            x.fillText(new Date(t0).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),L,h-12);
+            const endLabel=new Date(t1).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'});
+            x.fillText(endLabel,w-R-28,h-12);
+          }
+          tankNote.textContent=pts.length?'Viser '+pts.length+' målepunkter. Differansen er et estimat basert på tanknivå; påfylling og målevariasjoner påvirker resultatet.':(data.note||'Ingen historiske tankmålinger tilgjengelig i VRM for denne perioden.');
+        }catch(e){tankNote.textContent='Tankhistorikk kunne ikke hentes: '+e.message;}
+      }
+      tankButtons.forEach(b=>b.addEventListener('click',()=>loadTankHistory(Number(b.dataset.days))));
+      window.addEventListener('resize',()=>{const b=tankButtons.find(b=>b.classList.contains('active'));if(b)loadTankHistory(Number(b.dataset.days));});
+      loadTankHistory(14);
+    })();
+    </script>
     <script>
     (() => {
       const buttons=[...document.querySelectorAll('.periods button')];
