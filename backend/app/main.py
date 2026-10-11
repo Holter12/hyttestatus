@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_status as get_vrm_status
+from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_status as get_vrm_status
 
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
@@ -71,6 +71,17 @@ def history(days: int = Query(default=14, ge=7, le=30)) -> dict[str, object]:
     except VRMError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+
+
+@app.get("/api/tank-history")
+def tank_history(days: int = Query(default=14, ge=7, le=30)) -> dict[str, object]:
+    """Return historical tank levels for 7–30 days."""
+    if not vrm_configured():
+        raise HTTPException(status_code=503, detail="VRM er ikke konfigurert.")
+    try:
+        return get_vrm_tank_history(days)
+    except VRMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 @app.get("/api/vrm/check")
 def vrm_check() -> dict[str, object]:
