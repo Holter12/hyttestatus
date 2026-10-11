@@ -1,0 +1,61 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: hyttestatus-web
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MEDIA_ROOT: /app/media
+    ports:
+      - "127.0.0.1:8088:8000"
+    volumes:
+      - ${HYTTESTATUS_MEDIA_PATH:-../data/media}:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: hyttestatus-worker
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MEDIA_ROOT: /app/media
+    volumes:
+      - ${HYTTESTATUS_MEDIA_PATH:-../data/media}:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: hyttestatus-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hyttestatus}
+      POSTGRES_USER: ${POSTGRES_USER:-hyttestatus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ${HYTTESTATUS_DB_PATH:-../data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hyttestatus} -d ${POSTGRES_DB:-hyttestatus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+# Bind web only to localhost by default. Put it behind a trusted reverse proxy
+# or private access layer; do not expose Unraid management or this API directly.
