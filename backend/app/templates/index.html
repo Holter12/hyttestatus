@@ -128,12 +128,7 @@
           state.clean.forEach((s,j)=>{if(!s.points.length)return;let nearest=s.points[0];for(const p of s.points){if(Math.abs(p.timestamp-timestamp)<Math.abs(nearest.timestamp-timestamp))nearest=p;}lines.push(s.label+': '+nearest.value.toFixed(state.percent?1:3)+(state.percent?' %':' kWh'));});
           tip.textContent=lines.join('\n');tip.style.display='block';
           const xPos=Math.max(8,Math.min(state.w-190,plotX+10));tip.style.left=xPos+'px';tip.style.top='.5rem';
-          x.save();x.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);x.clearRect(0,0,state.w,state.h);
-          x.restore();
-          // Draw a vertical crosshair and dots on the nearest real values.
-          x.save();x.setTransform(window.devicePixelRatio||1,0,0,window.devicePixelRatio||1,0,0);x.strokeStyle='#596a61';x.setLineDash([4,3]);x.beginPath();x.moveTo(plotX,state.T);x.lineTo(plotX,state.h-state.B);x.stroke();x.setLineDash([]);
-          state.clean.forEach((s,j)=>{if(!s.points.length)return;let nearest=s.points[0];for(const p of s.points){if(Math.abs(p.timestamp-timestamp)<Math.abs(nearest.timestamp-timestamp))nearest=p;}x.fillStyle=state.colors[j%state.colors.length];x.beginPath();x.arc(state.pxFor(nearest.timestamp),state.pyFor(nearest.value),4,0,Math.PI*2);x.fill();});
-          x.restore();
+
         }
         c.onpointermove=e=>{if(e.pointerType==='mouse')showAt(e.clientX);};
         c.onpointerdown=e=>{showAt(e.clientX);};
