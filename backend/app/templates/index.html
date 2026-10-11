@@ -73,6 +73,63 @@
         <p class="subtle">Hyttestatus hentet svaret: {{ status.generated_at }}. Dette er hentetidspunktet, ikke nødvendigvis tidspunktet for siste måling på GX.</p>
       </section>
     </div>
+    <section class="card history" id="energy-history">
+      <h2>Historikk fra Victron VRM</h2>
+      <p class="subtle">Velg periode. Manglende målinger behandles som manglende data, ikke som null.</p>
+      <div class="periods"><button type="button" data-days="7">7 dager</button><button type="button" data-days="14" class="active">14 dager</button><button type="button" data-days="30">30 dager</button></div>
+      <div class="metrics">
+        <div class="metric"><div class="label">Første batterinivå</div><div class="value" id="hist-first">—</div></div>
+        <div class="metric"><div class="label">Siste batterinivå</div><div class="value" id="hist-last">—</div></div>
+        <div class="metric"><div class="label">Endring i perioden</div><div class="value" id="hist-change">—</div></div>
+        <div class="metric"><div class="label">Datapunkter SOC / Pb / Pc / Bc</div><div class="value" style="font-size:1.15rem" id="hist-counts">—</div></div>
+      </div>
+      <h3>Batteriprosent</h3><canvas id="hist-soc" height="190"></canvas>
+      <h3>Energiflyt per time (kWh)</h3><canvas id="hist-energy" height="210"></canvas>
+      <p class="subtle" id="hist-message" aria-live="polite">Henter historikk …</p>
+    </section>
+    <style>
+      .periods{display:flex;gap:.5rem;margin:.8rem 0 1rem;flex-wrap:wrap}
+      .periods button{border:1px solid #cbd6cd;border-radius:999px;padding:.5rem .9rem;background:#fff;color:#244536;cursor:pointer}
+      .periods button.active{background:#173b32;color:#fff}
+      #energy-history canvas{display:block;width:100%;height:190px;margin:.5rem 0 1rem}
+    </style>
+    <script>
+    (() => {
+      const buttons=[...document.querySelectorAll('.periods button')];
+      const note=document.getElementById('hist-message');
+      const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
+      function chart(id,series,percent){
+        const c=document.getElementById(id),w=Math.max(300,c.clientWidth||600),h=id==='hist-energy'?210:190,d=window.devicePixelRatio||1;
+        c.width=w*d;c.height=h*d;c.style.height=h+'px';const x=c.getContext('2d');x.scale(d,d);x.clearRect(0,0,w,h);
+        const all=series.flatMap(s=>s.points.map(p=>p.value)).filter(Number.isFinite);
+        if(!all.length){x.fillStyle='#758179';x.font='13px sans-serif';x.fillText('Ingen historiske målinger tilgjengelig',12,25);return;}
+        let lo=percent?Math.max(0,Math.floor(Math.min(...all)/10)*10):0,hi=percent?Math.min(100,Math.ceil(Math.max(...all)/10)*10):Math.max(.1,Math.ceil(Math.max(...all)*1.2*10)/10);if(hi<=lo)hi=lo+(percent?10:.1);
+        const L=38,R=12,T=12,B=28,pw=w-L-R,ph=h-T-B;
+        x.font='11px sans-serif';x.fillStyle='#758179';x.strokeStyle='#e2e8e2';
+        for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(percent?0:1),2,y+4);}
+        const times=series.flatMap(s=>s.points.map(p=>p.timestamp)),t0=Math.min(...times),t1=Math.max(...times),colors=['#237b52','#e3a12f','#447fc1'];
+        series.forEach((s,j)=>{const pts=s.points.slice().sort((a,b)=>a.timestamp-b.timestamp);if(!pts.length)return;x.strokeStyle=colors[j%colors.length];x.lineWidth=2;x.beginPath();pts.forEach((p,i)=>{const px=L+(p.timestamp-t0)/(t1-t0||1)*pw,py=T+(hi-p.value)/(hi-lo)*ph;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();});
+        x.fillStyle='#758179';x.fillText(new Date(t0).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),L,h-7);x.fillText(new Date(t1).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),w-R-35,h-7);
+        x.font='12px sans-serif';let lx=L;series.forEach((s,j)=>{if(!s.points.length)return;x.fillStyle=colors[j%colors.length];x.fillRect(lx,h-20,8,8);x.fillStyle='#53645d';x.fillText(s.label,lx+12,h-12);lx+=x.measureText(s.label).width+32;});
+      }
+      async function load(days){
+        buttons.forEach(b=>b.classList.toggle('active',Number(b.dataset.days)===days));note.textContent='Henter historikk …';
+        try{
+          const r=await fetch('/api/history?days='+days),data=await r.json();if(!r.ok)throw Error(data.detail||'Feil ved henting');
+          const s=data.series||{},soc=(s.SOC||[]).slice().sort((a,b)=>a.timestamp-b.timestamp),first=soc[0],last=soc[soc.length-1];
+          document.getElementById('hist-first').textContent=first?pct(first.value):'—';document.getElementById('hist-last').textContent=last?pct(last.value):'—';
+          document.getElementById('hist-change').textContent=first&&last?((last.value-first.value>0?'+':'')+(last.value-first.value).toFixed(1)+' prosentpoeng'):'—';
+          document.getElementById('hist-counts').textContent=['SOC','Pb','Pc','Bc'].map(k=>(s[k]||[]).length).join(' / ');
+          chart('hist-soc',[{label:'Batteri %',points:soc}],true);
+          chart('hist-energy',[{label:'Sol → batteri',points:s.Pb||[]},{label:'Sol → forbrukere',points:s.Pc||[]},{label:'Batteri → forbrukere',points:s.Bc||[]}],false);
+          const n=data.counts||{};note.textContent='Siste '+days+' dager. Antall datapunkter SOC / sol til batteri / sol til forbrukere / batteri til forbrukere: '+['SOC','Pb','Pc','Bc'].map(k=>n[k]||0).join(' / ')+'. Manglende datapunkter kan forekomme.';
+        }catch(e){note.textContent='Historikk kunne ikke hentes: '+e.message;}
+      }
+      buttons.forEach(b=>b.addEventListener('click',()=>load(Number(b.dataset.days))));
+      window.addEventListener('resize',()=>{const b=buttons.find(b=>b.classList.contains('active'));if(b)load(Number(b.dataset.days));});
+      load(14);
+    })();
+    </script>
     <section class="card history">
       <h2>Bildehistorikk</h2>
       <div class="history-row">
