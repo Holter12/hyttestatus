@@ -1,0 +1,1 @@
+"""Hyttestatus backend package."""
