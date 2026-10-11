@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark"><title>Avansert energipanel · {{ location_name }}</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182522;background:#f4f6f3}
+*{box-sizing:border-box}body{margin:0}header{background:#173b32;color:#fff;padding:1.2rem max(1rem,calc((100vw - 1100px)/2))}
+header a{color:#fff;opacity:.85}header h1{margin:.4rem 0;font-size:clamp(1.7rem,3vw,2.3rem)}main{max-width:1100px;margin:1.4rem auto;padding:0 1rem 3rem}
+nav{display:flex;gap:1rem;flex-wrap:wrap}nav a{color:#dcece2}.intro{color:#65756b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.card{background:#fff;border:1px solid #e1e7e1;border-radius:1rem;padding:1.2rem;box-shadow:0 3px 14px #152d200a}.card h2{margin:0 0 .8rem;font-size:1.15rem}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.metric{background:#fafbf9;border:1px solid #e6ebe6;border-radius:.7rem;padding:.85rem;min-width:0}
+.label{font-size:.82rem;color:#64736a}.value{font-size:1.5rem;font-weight:650;margin-top:.35rem;overflow-wrap:anywhere}.unit{font-size:.85rem;font-weight:500;color:#69786d}
+ul{list-style:none;margin:.5rem 0 0;padding:0}li{padding:.5rem 0;border-top:1px solid #edf0ec;display:flex;justify-content:space-between;gap:.8rem;font-size:.88rem}li span:first-child{color:#65756b}li span:last-child{text-align:right;overflow-wrap:anywhere}.subtle{color:#758179;font-size:.85rem}.pill{display:inline-block;background:#e5ede7;color:#315845;border-radius:999px;padding:.35rem .7rem;font-size:.8rem}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.value{font-size:1.3rem}}
+</style></head>
+<body><header><nav><a href="/">← Basic oversikt</a></nav><h1>Avansert energipanel</h1><div>Detaljer for batteri, to solcelleregulatorer og tank</div></header>
+<main><p class="intro">Liveverdier fra Victron VRM. Målinger vises med VRMs rapporterte enheter; vi merker ikke energiverdier som faktiske Ah før strømintegrasjon er verifisert.</p>
+{% if error %}<section class="card"><strong>Kunne ikke hente VRM-data</strong><p>{{ error }}</p></section>
+{% elif advanced %}
+<div class="grid">
+<section class="card"><h2>Batteri</h2><div class="metrics">
+<div class="metric"><div class="label">Ladenivå</div><div class="value">{{ '%.1f'|format(advanced.battery.soc_percent) if advanced.battery.soc_percent is not none else '—' }} <span class="unit">%</span></div></div>
+<div class="metric"><div class="label">Spenning</div><div class="value">{{ '%.2f'|format(advanced.battery.voltage_v) if advanced.battery.voltage_v is not none else '—' }} <span class="unit">V</span></div></div>
+<div class="metric"><div class="label">Strøm</div><div class="value">{{ '%.1f'|format(advanced.battery.current_a) if advanced.battery.current_a is not none else '—' }} <span class="unit">A</span></div></div>
+<div class="metric"><div class="label">Batterimonitor – kapasitet</div><div class="value">{{ '%.0f'|format(advanced.battery.capacity_ah) if advanced.battery.capacity_ah is not none else '—' }} <span class="unit">Ah</span></div></div>
+</div><ul><li><span>Forbrukte Ah (CE)</span><span>{{ '%.1f'|format(advanced.battery.consumed_ah) if advanced.battery.consumed_ah is not none else '—' }} Ah</span></li><li><span>Estimert tid igjen</span><span>{{ '%.1f'|format(advanced.battery.time_to_go_hours) if advanced.battery.time_to_go_hours is not none else '—' }} t</span></li></ul></section>
+{% for dev in [advanced.mppt1, advanced.mppt2] %}
+<section class="card"><h2>{{ dev.title }}</h2><p><span class="pill">{{ 'Tilkoblet' if dev.available else 'Ingen data' }}</span></p>
+<div class="metrics"><div class="metric"><div class="label">Spenning</div><div class="value">{{ '%.1f'|format(dev.voltage_v) if dev.voltage_v is not none else '—' }} <span class="unit">V</span></div></div><div class="metric"><div class="label">Strøm</div><div class="value">{{ '%.2f'|format(dev.current_a) if dev.current_a is not none else '—' }} <span class="unit">A</span></div></div><div class="metric"><div class="label">Effekt</div><div class="value">{{ '%.1f'|format(dev.power_w) if dev.power_w is not none else '—' }} <span class="unit">W</span></div></div><div class="metric"><div class="label">Temperatur</div><div class="value">{{ '%.1f'|format(dev.temperature_c) if dev.temperature_c is not none else '—' }} <span class="unit">°C</span></div></div></div>
+<h3>Tilgjengelige VRM-målinger</h3><ul>{% for item in dev.items %}<li><span>{{ item.description or item.code }}</span><span>{{ item.value if item.value is not none else '—' }}</span></li>{% else %}<li><span>Ingen målinger funnet</span><span>—</span></li>{% endfor %}</ul></section>
+{% endfor %}
+<section class="card"><h2>Tank</h2><div class="metrics"><div class="metric"><div class="label">Nivå</div><div class="value">{{ '%.0f'|format(advanced.tank.level_percent) if advanced.tank.level_percent is not none else '—' }} <span class="unit">%</span></div></div><div class="metric"><div class="label">Liter igjen</div><div class="value">{{ '%.0f'|format(advanced.tank.remaining_liters*1000) if advanced.tank.remaining_liters is not none else '—' }} <span class="unit">liter</span></div></div><div class="metric"><div class="label">Kapasitet</div><div class="value">{{ '%.0f'|format(advanced.tank.capacity_liters*1000) if advanced.tank.capacity_liters is not none else '—' }} <span class="unit">liter</span></div></div></div><h3>Tilgjengelige tankmålinger</h3><ul>{% for item in advanced.tank.items %}<li><span>{{ item.description or item.code }}</span><span>{{ item.value if item.value is not none else '—' }}</span></li>{% else %}<li><span>Ingen målinger funnet</span><span>—</span></li>{% endfor %}</ul></section>
+<section class="card"><h2>Historikk og faktiske Ah</h2><p>Dette er første versjon av avansert side. Vi har liveverdier og lister over enhetsspesifikke VRM-målinger. Neste steg er å verifisere historiske strømserier per regulator før vi viser Ah per time eller dag.</p><p class="subtle">Ikke alle VRM-målekoder finnes på alle enheter. Manglende verdier vises som —, ikke som null.</p></section>
+</div>
+{% endif %}
+<p class="subtle">Datakilde: Victron GX via Victron VRM API · {{ year }}</p></main></body></html>
