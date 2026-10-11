@@ -18,7 +18,7 @@ def configured() -> bool:
     return bool(os.getenv("VRM_API_TOKEN", "").strip() and os.getenv("VRM_INSTALLATION_ID", "").strip())
 
 
-def _request(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+def _request(path: str, params: Any = None) -> dict[str, Any]:
     token = os.getenv("VRM_API_TOKEN", "").strip()
     installation_id = os.getenv("VRM_INSTALLATION_ID", "").strip()
     if not token or not installation_id:
@@ -107,6 +107,59 @@ def _today_energy_totals() -> tuple[float | None, float | None]:
     )
     # VRM returns false for unavailable series. Keep these as None, never as 0.
     return solar, battery_to_consumers
+
+
+def get_history(days: int = 14) -> dict[str, Any]:
+    """Fetch hourly battery and energy history for the requested recent period."""
+    if days < 7 or days > 30:
+        raise VRMError("Historikkperioden må være mellom 7 og 30 dager.")
+    timezone_name = os.getenv("TIMEZONE", "Europe/Oslo")
+    try:
+        site_tz = ZoneInfo(timezone_name)
+    except Exception:
+        site_tz = ZoneInfo("Europe/Oslo")
+    now = datetime.now(site_tz)
+    start = int((now - timedelta(days=days)).timestamp())
+    end = int(now.timestamp())
+    params: list[tuple[str, str]] = [
+        ("type", "custom"),
+        ("interval", "hours"),
+        ("start", str(start)),
+        ("end", str(end)),
+    ]
+    for code in ("SOC", "Pb", "Pc", "Bc"):
+        params.append(("attributeCodes[]", code))
+    payload = _request("stats", params)
+    records = payload.get("records", {})
+    if not isinstance(records, dict):
+        records = {}
+
+    def points(code: str) -> list[dict[str, float | int]]:
+        raw_series = records.get(code)
+        if not isinstance(raw_series, list):
+            return []
+        result: list[dict[str, float | int]] = []
+        for item in raw_series:
+            if not isinstance(item, list) or len(item) < 2:
+                continue
+            try:
+                timestamp = int(item[0])
+                value = float(item[1])
+            except (TypeError, ValueError):
+                continue
+            if value < 0:
+                continue
+            result.append({"timestamp": timestamp, "value": value})
+        return result
+
+    series = {code: points(code) for code in ("SOC", "Pb", "Pc", "Bc")}
+    return {
+        "days": days,
+        "timezone": timezone_name,
+        "data_source": "Victron GX via Victron VRM API",
+        "series": series,
+        "counts": {code: len(values) for code, values in series.items()},
+    }
 
 
 def get_status() -> dict[str, Any]:
