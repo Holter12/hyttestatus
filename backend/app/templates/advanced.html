@@ -31,7 +31,74 @@ ul{list-style:none;margin:.5rem 0 0;padding:0}li{padding:.5rem 0;border-top:1px 
 <h3>Tilgjengelige VRM-målinger</h3><ul>{% for item in dev['items'] %}<li><span>{{ item.description or item.code }}</span><span>{{ item.value if item.value is not none else '—' }}</span></li>{% else %}<li><span>Ingen målinger funnet</span><span>—</span></li>{% endfor %}</ul></section>
 {% endfor %}
 <section class="card"><h2>Tank</h2><div class="metrics"><div class="metric"><div class="label">Nivå</div><div class="value">{{ '%.0f'|format(advanced.tank.level_percent) if advanced.tank.level_percent is not none else '—' }} <span class="unit">%</span></div></div><div class="metric"><div class="label">Liter igjen</div><div class="value">{{ '%.0f'|format(advanced.tank.remaining_liters*1000) if advanced.tank.remaining_liters is not none else '—' }} <span class="unit">liter</span></div></div><div class="metric"><div class="label">Kapasitet</div><div class="value">{{ '%.0f'|format(advanced.tank.capacity_liters*1000) if advanced.tank.capacity_liters is not none else '—' }} <span class="unit">liter</span></div></div></div><h3>Tilgjengelige tankmålinger</h3><ul>{% for item in advanced.tank['items'] %}<li><span>{{ item.description or item.code }}</span><span>{{ item.value if item.value is not none else '—' }}</span></li>{% else %}<li><span>Ingen målinger funnet</span><span>—</span></li>{% endfor %}</ul></section>
+<section class="card" style="grid-column:1/-1"><h2>Solcelleproduksjon per MPPT og beregnet solinnstråling</h2>
+<p class="subtle">Timeverdier fra lokal innsamling. Solinnstråling er en klarværmodell (ikke en fysisk sensor); oppgi LATITUDE og LONGITUDE i miljøvariablene for å aktivere den. Hold musepekeren over grafen eller trykk på den for verdier.</p>
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.8rem 0"><label for="solar-day">Dag</label><input id="solar-day" type="date"><button id="solar-refresh" type="button">Oppdater</button><span id="solar-note" class="subtle">Henter lokal historikk …</span></div>
+<canvas id="solar-mppt-chart" aria-label="Timevis solcelleeffekt per MPPT og estimert solinnstråling" style="width:100%;height:300px;display:block;touch-action:pan-y"></canvas><div id="solar-mppt-tip" role="status" style="white-space:pre-line;display:none;position:relative;background:#173b32;color:white;padding:.65rem .8rem;border-radius:.6rem;margin-top:.5rem;font-size:.85rem"></div>
+<p class="subtle">MPPT-effekt vises kun hvis VRM rapporterer en gjenkjent effektkode (PVP, Pdc eller PPV). Manglende målinger vises som hull, ikke null. Første kjøring samler data fremover; historikken fylles gradvis.</p></section>
 <section class="card"><h2>Historikk og faktiske Ah</h2><p>Dette er første versjon av avansert side. Vi har liveverdier og lister over enhetsspesifikke VRM-målinger. Neste steg er å verifisere historiske strømserier per regulator før vi viser Ah per time eller dag.</p><p class="subtle">Ikke alle VRM-målekoder finnes på alle enheter. Manglende verdier vises som —, ikke som null.</p></section>
 </div>
 {% endif %}
-<p class="subtle">Datakilde: Victron GX via Victron VRM API · {{ year }}</p></main></body></html>
+<p class="subtle">Datakilde: Victron GX via Victron VRM API · {{ year }}</p></main><script>
+(function(){
+const canvas=document.getElementById('solar-mppt-chart'),tip=document.getElementById('solar-mppt-tip'),note=document.getElementById('solar-note'),dateInput=document.getElementById('solar-day');
+if(!canvas)return;
+const ctx=canvas.getContext('2d');let state=null,allData=null;
+const powerCodes=['PVP','Pdc','PPV'];
+function solarElevation(ts,lat,lon){
+ const d=new Date(ts*1000),day=Math.floor((Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())-Date.UTC(d.getUTCFullYear(),0,0))/86400000);
+ const gamma=2*Math.PI/365*(day-1+(d.getUTCHours()-12)/24);
+ const decl=.006918-.399912*Math.cos(gamma)+.070257*Math.sin(gamma)-.006758*Math.cos(2*gamma)+.000907*Math.sin(2*gamma)-.002697*Math.cos(3*gamma)+.00148*Math.sin(3*gamma);
+ const eq=229.18*(.000075+.001868*Math.cos(gamma)-.032077*Math.sin(gamma)-.014615*Math.cos(2*gamma)-.040849*Math.sin(2*gamma));
+ const solarMin=d.getUTCHours()*60+d.getUTCMinutes()+eq+4*lon;
+ const ha=(solarMin/4-180)*Math.PI/180,phi=lat*Math.PI/180;
+ return Math.asin(Math.sin(phi)*Math.sin(decl)+Math.cos(phi)*Math.cos(decl)*Math.cos(ha))*180/Math.PI;
+}
+function draw(){
+ const rect=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1,w=Math.max(320,rect.width),h=300;
+ canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,w,h);
+ const L=46,R=42,T=16,B=35,pw=w-L-R,ph=h-T-B;
+ ctx.font='11px sans-serif';ctx.fillStyle='#718077';ctx.strokeStyle='#e4e9e4';
+ for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();ctx.fillText(String(Math.round(state?state.maxW*(1-i/4):0)),3,y+4);ctx.fillText(String(Math.round(state?state.maxG*(1-i/4):0)),w-R+5,y+4);}
+ ctx.fillText('Effekt W',L,T-4);ctx.fillText('W/m²',w-R-30,T-4);
+ if(!state||!state.hours.length){ctx.fillStyle='#718077';ctx.fillText('Ingen lokale målinger for valgt dag ennå',L,T+25);return;}
+ const x=i=>L+(i+.5)*pw/24,yW=v=>T+ph-(v/state.maxW)*ph,yG=v=>T+ph-(v/state.maxG)*ph;
+ const series=[['MPPT 1','#237b52','mppt1'],['MPPT 2','#447fc1','mppt2']];
+ series.forEach(([label,color,key])=>{ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();let open=false;state.hours.forEach((v,i)=>{if(v[key]===null){open=false;return;}const xx=x(i),yy=yW(v[key]);if(!open){ctx.moveTo(xx,yy);open=true;}else ctx.lineTo(xx,yy);});ctx.stroke();});
+ if(state.hasIrr){ctx.strokeStyle='#d48a27';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.beginPath();let open=false;state.hours.forEach((v,i)=>{if(v.irr===null){open=false;return;}const xx=x(i),yy=yG(v.irr);if(!open){ctx.moveTo(xx,yy);open=true;}else ctx.lineTo(xx,yy);});ctx.stroke();ctx.setLineDash([]);}
+ ctx.fillStyle='#718077';for(let i=0;i<24;i+=3)ctx.fillText(String(i).padStart(2,'0')+':00',x(i)-12,h-12);
+ state.geometry={L,R,T,B,pw,ph,w,h,x,yW,yG};
+}
+function show(clientX){
+ if(!state)return;const r=canvas.getBoundingClientRect(),g=state.geometry,px=Math.max(g.L,Math.min(g.w-g.R,clientX-r.left)),idx=Math.max(0,Math.min(23,Math.floor((px-g.L)/g.pw*24))),v=state.hours[idx];
+ tip.textContent=String(idx).padStart(2,'0')+':00–'+String((idx+1)%24).padStart(2,'0')+':00\nMPPT 1: '+(v.mppt1===null?'ingen data':v.mppt1.toFixed(1)+' W')+'\nMPPT 2: '+(v.mppt2===null?'ingen data':v.mppt2.toFixed(1)+' W')+'\nBeregnet solinnstråling: '+(v.irr===null?'ikke beregnet':Math.round(v.irr)+' W/m²');
+ tip.style.display='block';
+}
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')show(e.clientX);});
+canvas.addEventListener('pointerdown',e=>show(e.clientX));
+canvas.addEventListener('pointerleave',()=>{tip.style.display='none';});
+async function load(){
+ note.textContent='Henter historikk …';
+ try{
+  const r=await fetch('/api/local-history?days=30'),d=await r.json();if(!r.ok)throw Error(d.detail||'API-feil');allData=d;
+  const date=dateInput.value?new Date(dateInput.value+'T12:00:00'):new Date();if(!dateInput.value)dateInput.value=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+  const start=new Date(dateInput.value+'T00:00:00');const dayStart=Math.floor(start.getTime()/1000);const series=d.series||{};
+  function getPower(instance){
+   const dev=series[String(instance)]||{};let found=null;
+   for(const code of powerCodes){if(Array.isArray(dev[code])&&dev[code].length){found=dev[code];break;}}
+   return found||[];
+  }
+  const p1=getPower(30),p2=getPower(277),hours=Array.from({length:24},(_,i)=>({hour:i,mppt1:null,mppt2:null,irr:null}));
+  function average(points,key){const buckets=Array.from({length:24},()=>[]);points.forEach(p=>{const dt=new Date(p.timestamp*1000);if(dt.getFullYear()===start.getFullYear()&&dt.getMonth()===start.getMonth()&&dt.getDate()===start.getDate())buckets[dt.getHours()].push(p.value);});buckets.forEach((a,i)=>{if(a.length)hours[i][key]=a.reduce((s,v)=>s+v,0)/a.length;});}
+  average(p1,'mppt1');average(p2,'mppt2');
+  const lat=d.latitude,lon=d.longitude;
+  if(Number.isFinite(lat)&&Number.isFinite(lon)){hours.forEach((v,i)=>{const ts=dayStart+i*3600+1800,el=solarElevation(ts,lat,lon);v.irr=el>0?Math.min(1000,Math.max(0,1000*Math.sin(el*Math.PI/180)*.75)):0;});}
+  const values=hours.flatMap(v=>[v.mppt1,v.mppt2]).filter(Number.isFinite),maxW=Math.max(10,Math.ceil(Math.max(0,...values)*1.15/10)*10),maxG=1000;
+  state={hours,maxW,maxG,hasIrr:Number.isFinite(lat)&&Number.isFinite(lon)};draw();
+  note.textContent=d.sample_count+' lagrede måleverdier · '+(state.hasIrr?'klarvær-estimat aktivt':'sett LATITUDE og LONGITUDE for solinnstråling');
+ }catch(e){state=null;draw();note.textContent='Historikk utilgjengelig: '+e.message;}
+}
+document.getElementById('solar-refresh').addEventListener('click',load);dateInput.addEventListener('change',load);window.addEventListener('resize',draw);load();
+})();
+</script>
+</body></html>
