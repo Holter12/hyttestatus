@@ -109,7 +109,7 @@
         <div class="metric"><div class="label">Liter nå / siste måling</div><div class="value" id="tank-end">—</div></div>
         <div class="metric"><div class="label">Differanse / estimert forbruk</div><div class="value" id="tank-diff">—</div></div>
       </div>
-      <div class="chart-wrap"><canvas id="tank-history-chart" height="190" aria-label="Tankinnhold i liter over tid" role="img"></canvas></div>
+      <div class="chart-wrap" style="position:relative"><canvas id="tank-history-chart" height="190" aria-label="Tankinnhold i liter over tid. Hold musepekeren over grafen eller trykk for dato og liter." role="img" style="display:block;width:100%;height:190px;touch-action:pan-y;cursor:crosshair"></canvas><div class="chart-tip" id="tank-history-tip" style="display:none;position:absolute;z-index:2;top:.5rem;left:.5rem;max-width:calc(100% - 1rem);padding:.55rem .7rem;background:#173b32;color:#fff;border-radius:.5rem;font-size:.8rem;line-height:1.45;white-space:pre-line;box-shadow:0 2px 10px #0002;pointer-events:none"></div></div>
       <p class="subtle" id="tank-history-message" aria-live="polite">Henter tankhistorikk …</p>
     </section>
     {% endif %}
@@ -159,11 +159,14 @@
           const c=document.getElementById('tank-history-chart'),w=Math.max(300,c.clientWidth||600),h=190,d=window.devicePixelRatio||1;
           c.width=w*d;c.height=h*d;c.style.height=h+'px';
           const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);
+          const tankChartState={pts,w,h,L:42,R:12,T:12,B:34,tip:document.getElementById('tank-history-tip'),canvas:c};
           if(pts.length<2){
             x.fillStyle='#758179';x.font='13px sans-serif';x.fillText(pts.length?'Bare ett målepunkt – ikke nok til å vise utvikling':'Ingen historiske tankmålinger tilgjengelig',12,25);
+            tankChartState.px=()=>42;tankChartState.py=()=>20;
           }else{
             const values=pts.map(p=>p.liters),lo=Math.max(0,Math.floor(Math.min(...values)/10)*10),hi=Math.max(lo+10,Math.ceil(Math.max(...values)/10)*10),L=42,R=12,T=12,B=34,pw=w-L-R,ph=h-T-B,t0=pts[0].timestamp,t1=pts[pts.length-1].timestamp;
             const px=t=>L+(t-t0)/(t1-t0||1)*pw,py=v=>T+(hi-v)/(hi-lo)*ph;
+            tankChartState.px=px;tankChartState.py=py;tankChartState.L=L;tankChartState.R=R;tankChartState.T=T;tankChartState.B=B;tankChartState.pw=pw;tankChartState.ph=ph;
             x.font='11px sans-serif';x.fillStyle='#758179';x.strokeStyle='#e2e8e2';
             for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(0),2,y+4);}
             x.strokeStyle='#237b52';x.lineWidth=2;x.beginPath();
@@ -174,9 +177,32 @@
             const endLabel=new Date(t1).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'});
             x.fillText(endLabel,w-R-28,h-12);
           }
-          tankNote.textContent=pts.length?'Viser '+pts.length+' målepunkter. Differansen er et estimat basert på tanknivå; påfylling og målevariasjoner påvirker resultatet.':(data.note||'Ingen historiske tankmålinger tilgjengelig i VRM for denne perioden.');
+          c._tankChartState=tankChartState;
+          tankNote.textContent=pts.length?'Viser '+pts.length+' målepunkter. Hold musepekeren over grafen eller trykk for dato og liter. Differansen er et estimat basert på tanknivå; påfylling og målevariasjoner påvirker resultatet.':(data.note||'Ingen historiske tankmålinger tilgjengelig i VRM for denne perioden.');
         }catch(e){tankNote.textContent='Tankhistorikk kunne ikke hentes: '+e.message;}
       }
+      const tankCanvas=document.getElementById('tank-history-chart');
+      function showTankPoint(clientX){
+        const s=tankCanvas._tankChartState;if(!s||!s.pts.length)return;
+        const rect=tankCanvas.getBoundingClientRect(),xPos=clientX-rect.left;
+        const plotX=Math.max(s.L,Math.min(tankCanvas.clientWidth-s.R,xPos));
+        const ratio=(plotX-s.L)/Math.max(1,tankCanvas.clientWidth-s.L-s.R);
+        const t0=s.pts[0].timestamp,t1=s.pts[s.pts.length-1].timestamp,target=t0+ratio*(t1-t0);
+        let nearest=s.pts[0];for(const p of s.pts)if(Math.abs(p.timestamp-target)<Math.abs(nearest.timestamp-target))nearest=p;
+        const date=new Date(nearest.timestamp);
+        const label=date.toLocaleString('no-NO',{weekday:'short',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const tip=document.getElementById('tank-history-tip');tip.textContent=label+'\\nTankinnhold: '+fmtLiters(nearest.liters);tip.style.display='block';
+        tip.style.left=Math.max(8,Math.min(tankCanvas.clientWidth-230,plotX+10))+'px';tip.style.top='.5rem';
+        const ctx=tankCanvas.getContext('2d'),d=window.devicePixelRatio||1;ctx.save();ctx.setTransform(d,0,0,d,0,0);
+        const h=190;ctx.clearRect(0,0,tankCanvas.clientWidth,h);
+        const pts=s.pts,values=pts.map(p=>p.liters),lo=Math.max(0,Math.floor(Math.min(...values)/10)*10),hi=Math.max(lo+10,Math.ceil(Math.max(...values)/10)*10);
+        const L=s.L,R=s.R,T=s.T,B=s.B,pw=tankCanvas.clientWidth-L-R,ph=h-T-B,px=t=>L+(t-t0)/(t1-t0||1)*pw,py=v=>T+(hi-v)/(hi-lo)*ph;
+        ctx.strokeStyle='#237b52';ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,i)=>{if(i===0)ctx.moveTo(px(p.timestamp),py(p.liters));else ctx.lineTo(px(p.timestamp),py(p.liters));});ctx.stroke();
+        ctx.fillStyle='#e3a12f';ctx.beginPath();ctx.arc(px(nearest.timestamp),py(nearest.liters),4,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+      tankCanvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')showTankPoint(e.clientX);});
+      tankCanvas.addEventListener('pointerdown',e=>showTankPoint(e.clientX));
+      tankCanvas.addEventListener('pointerleave',()=>{document.getElementById('tank-history-tip').style.display='none';});
       tankButtons.forEach(b=>b.addEventListener('click',()=>loadTankHistory(Number(b.dataset.days))));
       window.addEventListener('resize',()=>{const b=tankButtons.find(b=>b.classList.contains('active'));if(b)loadTankHistory(Number(b.dataset.days));});
       loadTankHistory(14);
