@@ -9,7 +9,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_advanced_status as get_vrm_advanced_status, get_status as get_vrm_status\nfrom app.history_store import read_samples as read_local_samples
+from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_advanced_status as get_vrm_advanced_status, get_status as get_vrm_status
+from app.history_store import read_samples as read_local_samples
 
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
@@ -154,4 +155,3 @@ def local_history(days: int = Query(default=7, ge=1, le=365)) -> dict[str, objec
         return read_local_samples(days)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Lokal historik er ikke tilgjengelig ennå. Kontroller database og worker.") from exc
-\n
