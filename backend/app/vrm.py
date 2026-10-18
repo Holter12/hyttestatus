@@ -356,3 +356,28 @@ def get_status() -> dict[str, Any]:
         # Live battery readings remain useful if the statistics endpoint is unavailable.
         result["message"] = "Batteridata hentet fra hyttas GX via VRM; dagens energistatistikk er foreløpig utilgjengelig."
     return result
+
+
+def get_diagnostic_samples() -> list[dict[str, Any]]:
+    """Return numeric VRM diagnostics for local time-series storage."""
+    diagnostics = _records(_request("diagnostics", {"count": 1000}))
+    samples: list[dict[str, Any]] = []
+    for item in diagnostics:
+        if not isinstance(item, dict):
+            continue
+        raw = item.get("rawValue")
+        if raw is None:
+            raw = item.get("value")
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if not (value == value and abs(value) != float("inf")):
+            continue
+        samples.append({
+            "instance": item.get("instance", "unknown"),
+            "code": item.get("code"),
+            "description": item.get("description"),
+            "value": value,
+        })
+    return samples
