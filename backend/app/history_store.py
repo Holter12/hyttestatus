@@ -94,6 +94,8 @@ def read_samples(days: int = 7) -> dict[str, Any]:
         "days": days,
         "sampling_interval_minutes": int(os.getenv("VRM_POLL_INTERVAL_SECONDS", "300")) // 60,
         "data_source": "Lokalt lagrede VRM-diagnostikkmålinger",
-        "sample_count": len(rows),\n        "latitude": float(os.getenv("LATITUDE")) if os.getenv("LATITUDE") else None,\n        "longitude": float(os.getenv("LONGITUDE")) if os.getenv("LONGITUDE") else None,
+        "sample_count": len(rows),
+        "latitude": float(os.getenv("LATITUDE")) if os.getenv("LATITUDE") else None,
+        "longitude": float(os.getenv("LONGITUDE")) if os.getenv("LONGITUDE") else None,
         "series": series,
     }
