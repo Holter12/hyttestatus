@@ -197,7 +197,7 @@
         const h=190;ctx.clearRect(0,0,tankCanvas.clientWidth,h);
         const pts=s.pts,values=pts.map(p=>p.liters),lo=Math.max(0,Math.floor(Math.min(...values)/10)*10),hi=Math.max(lo+10,Math.ceil(Math.max(...values)/10)*10);
         const L=s.L,R=s.R,T=s.T,B=s.B,pw=tankCanvas.clientWidth-L-R,ph=h-T-B,px=t=>L+(t-t0)/(t1-t0||1)*pw,py=v=>T+(hi-v)/(hi-lo)*ph;
-        ctx.strokeStyle='#237b52';ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,i)=>{if(i===0)ctx.moveTo(px(p.timestamp),py(p.liters));else ctx.lineTo(px(p.timestamp),py(p.liters));});ctx.stroke();
+        ctx.font='11px sans-serif';ctx.fillStyle='#758179';ctx.strokeStyle='#e2e8e2';for(let i=0;i<=4;i++){const gy=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,gy);ctx.lineTo(tankCanvas.clientWidth-R,gy);ctx.stroke();ctx.fillText((hi-(hi-lo)*i/4).toFixed(0),2,gy+4);}ctx.fillStyle='#758179';ctx.font='10px sans-serif';ctx.fillText(new Date(t0*1000).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),L,h-12);ctx.fillText(new Date(t1*1000).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),tankCanvas.clientWidth-R-28,h-12);ctx.strokeStyle='#237b52';ctx.lineWidth=2;ctx.beginPath();pts.forEach((p,i)=>{if(i===0)ctx.moveTo(px(p.timestamp),py(p.liters));else ctx.lineTo(px(p.timestamp),py(p.liters));});ctx.stroke();
         ctx.fillStyle='#e3a12f';ctx.beginPath();ctx.arc(px(nearest.timestamp),py(nearest.liters),4,0,Math.PI*2);ctx.fill();ctx.restore();
       }
       tankCanvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')showTankPoint(e.clientX);});
