@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.vrm import VRMError, configured as vrm_configured, get_history as get_vrm_history, get_tank_history as get_vrm_tank_history, get_advanced_status as get_vrm_advanced_status, get_status as get_vrm_status
@@ -14,7 +12,6 @@ from app.history_store import read_samples as read_local_samples
 
 APP_NAME = os.getenv("APP_NAME", "Hyttestatus")
 LOCATION_NAME = os.getenv("DEFAULT_LOCATION_NAME", "Hytte")
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/app/media"))
 
 app = FastAPI(
     title=APP_NAME,
@@ -23,8 +20,6 @@ app = FastAPI(
 )
 
 templates = Jinja2Templates(directory="/app/app/templates")
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT), check_dir=False), name="media")
 
 
 def current_status() -> dict[str, object]:
@@ -38,7 +33,6 @@ def current_status() -> dict[str, object]:
         "solar_energy_today_kwh": None,
         "load_energy_today_kwh": None,
         "battery_to_consumers_today_kwh": None,
-        "latest_image": None,
     }
     if not vrm_configured():
         return payload
