@@ -42,11 +42,20 @@ def init_db() -> None:
 
 def save_samples(samples: list[dict[str, Any]], sampled_at: datetime | None = None) -> int:
     """Persist numeric diagnostic values; duplicate samples are ignored."""
-    timestamp = sampled_at or datetime.now(timezone.utc)
+    fallback_timestamp = sampled_at or datetime.now(timezone.utc)
     rows = []
     for item in samples:
         try:
             value = float(item.get("value"))
+            raw_timestamp = item.get("timestamp")
+            try:
+                measurement_timestamp = (
+                    datetime.fromtimestamp(float(raw_timestamp), timezone.utc)
+                    if raw_timestamp is not None
+                    else fallback_timestamp
+                )
+            except (TypeError, ValueError, OverflowError, OSError):
+                measurement_timestamp = fallback_timestamp
             if value != value or value in (float("inf"), float("-inf")):
                 continue
             code = str(item.get("code") or "").strip()
@@ -54,7 +63,7 @@ def save_samples(samples: list[dict[str, Any]], sampled_at: datetime | None = No
             if not code:
                 continue
             rows.append({
-                "sampled_at": timestamp,
+                "sampled_at": measurement_timestamp,
                 "instance": instance,
                 "code": code,
                 "description": str(item.get("description") or "")[:500],
