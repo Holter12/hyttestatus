@@ -65,6 +65,57 @@
         <p class="subtle">Hyttestatus hentet svaret: {{ status.generated_at }}. Dette er hentetidspunktet, ikke nødvendigvis tidspunktet for siste måling på GX.</p>
       </section>
     </div>
+    <section class="card history" id="local-temperature">
+      <h2>Offline / lokal temperaturhistorikk</h2>
+      <p class="subtle">Målinger lagret lokalt fra siste VRM-kontakt. Historikken virker også når Starlink er avslått.</p>
+      <div class="metrics">
+        <div class="metric"><div class="label">Hytte · temperatur</div><div class="value" id="temp-in">—</div><div class="subtle" id="temp-in-time">Venter på lokale data</div></div>
+        <div class="metric"><div class="label">Ute · temperatur</div><div class="value" id="temp-out">—</div><div class="subtle" id="temp-out-time">Venter på lokale data</div></div>
+        <div class="metric"><div class="label">Batteritemperatur</div><div class="value" id="temp-bat">—</div><div class="subtle" id="temp-bat-time">Venter på lokale data</div></div>
+        <div class="metric"><div class="label">Luftfuktighet inne / ute</div><div class="value" style="font-size:1.35rem" id="temp-humidity">—</div><div class="subtle" id="temp-humidity-time">Fra siste lagrede målinger</div></div>
+      </div>
+      <div class="periods" id="temp-periods"><button type="button" data-days="1">24 timer</button><button type="button" data-days="7" class="active">7 dager</button><button type="button" data-days="30">30 dager</button></div>
+      <div class="chart-wrap" style="position:relative"><canvas id="temp-chart" height="220" aria-label="Lokal historikk for temperatur inne, ute og batteri" role="img" style="display:block;width:100%;height:220px;touch-action:pan-y"></canvas></div>
+      <p class="subtle" id="temp-note" aria-live="polite">Henter lokal temperaturhistorikk …</p>
+    </section>
+    <script>
+    (()=> {
+      const note=document.getElementById('temp-note'),canvas=document.getElementById('temp-chart'),ctx=canvas.getContext('2d');
+      const configs=[['Hytte',24,'tsT','temp-in','temp-in-time'],['Ute',25,'tsT','temp-out','temp-out-time'],['Batteri',278,'BT','temp-bat','temp-bat-time']];
+      let points=[],days=7;
+      const fmtTime=t=>new Date(t*1000).toLocaleString('no-NO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      function draw(){
+        const w=Math.max(300,canvas.clientWidth||600),h=220,d=window.devicePixelRatio||1;canvas.width=w*d;canvas.height=h*d;ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);
+        const all=points.flatMap(s=>s.values.map(p=>p.value)).filter(Number.isFinite),L=42,R=12,T=12,B=30;
+        if(!all.length){ctx.fillStyle='#758179';ctx.font='13px sans-serif';ctx.fillText('Ingen lokale temperaturmålinger for perioden',12,28);return;}
+        const lo=Math.floor(Math.min(...all)-1),hi=Math.ceil(Math.max(...all)+1),t0=Math.min(...points.flatMap(s=>s.values.map(p=>p.timestamp))),t1=Math.max(...points.flatMap(s=>s.values.map(p=>p.timestamp)));
+        const px=t=>L+(t-t0)/(t1-t0||1)*(w-L-R),py=v=>T+(hi-v)/(hi-lo||1)*(h-T-B);
+        ctx.font='11px sans-serif';ctx.fillStyle='#758179';ctx.strokeStyle='#e4e9e4';
+        for(let n=0;n<=4;n++){const y=T+(h-T-B)*n/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();ctx.fillText((hi-(hi-lo)*n/4).toFixed(0)+'°',2,y+4);}
+        const colors=['#237b52','#447fc1','#d48a27'];
+        points.forEach((s,j)=>{ctx.strokeStyle=colors[j];ctx.lineWidth=2;ctx.beginPath();let open=false;s.values.forEach(p=>{if(!Number.isFinite(p.value)){open=false;return;}if(!open){ctx.moveTo(px(p.timestamp),py(p.value));open=true;}else ctx.lineTo(px(p.timestamp),py(p.value));});ctx.stroke();});
+        ctx.fillStyle='#53645d';ctx.font='11px sans-serif';ctx.fillText(fmtTime(t0),L,h-8);ctx.fillText(fmtTime(t1),Math.max(L,w-R-100),h-8);
+        ctx.fillText('Grønn: Hytte · Blå: Ute · Oransje: Batteri',L,11);
+      }
+      async function load(n){
+        days=n;document.querySelectorAll('#temp-periods button').forEach(b=>b.classList.toggle('active',Number(b.dataset.days)===n));
+        note.textContent='Henter lokal historikk …';
+        try{
+          const r=await fetch('/api/local-history?days='+n),d=await r.json();if(!r.ok)throw Error(d.detail||'API-feil');
+          const s=d.series||{};
+          const get=(inst,code)=>Array.isArray(s[String(inst)]?.[code])?s[String(inst)][code].filter(p=>Number.isFinite(p.timestamp)&&Number.isFinite(p.value)):[];
+          points=configs.map(c=>({label:c[0],values:get(c[1],c[2])}));
+          configs.forEach(c=>{const a=get(c[1],c[2]),last=a[a.length-1];document.getElementById(c[3]).textContent=last?last.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' °C':'—';document.getElementById(c[4]).textContent=last?'Sist lagret '+fmtTime(last.timestamp):'Ingen måling lagret';});
+          const hin=get(24,'tsH'),hout=get(25,'tsH'),lh=hin[hin.length-1],lo=hout[hout.length-1];
+          document.getElementById('temp-humidity').textContent=(lh?lh.value.toLocaleString('no-NO',{maximumFractionDigits:1)+' %':'—')+' / '+(lo?lo.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' %':'—');
+          document.getElementById('temp-humidity-time').textContent='Hytte / ute · siste lagrede verdier';
+          draw();note.textContent=(d.sample_count||0)+' lokale måleverdier · siste registrering '+(d.latest_sample_at||'ukjent tidspunkt')+'. Verdiene er sist lagret, ikke nødvendigvis sanntid.';
+        }catch(e){points=[];draw();note.textContent='Lokal historikk utilgjengelig: '+e.message;}
+      }
+      document.querySelectorAll('#temp-periods button').forEach(b=>b.addEventListener('click',()=>load(Number(b.dataset.days))));
+      window.addEventListener('resize',draw);load(7);
+    })();
+    </script>
     {% if status.tank_level_percent is not none or status.tank_remaining_liters is not none %}
     <section class="card history" aria-labelledby="tank-heading">
       <h2 id="tank-heading">Tankstatus</h2>
