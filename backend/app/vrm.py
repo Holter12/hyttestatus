@@ -368,6 +368,14 @@ def get_diagnostic_samples() -> list[dict[str, Any]]:
         raw = item.get("rawValue")
         if raw is None:
             raw = item.get("value")
+        if raw is None:
+            # Some VRM diagnostics (including RuuviTag tsT/tsH and battery BT)
+            # expose the measurement only in formattedValue, e.g. "26.6 °C".
+            formatted = item.get("formattedValue")
+            if isinstance(formatted, str):
+                import re
+                match = re.match(r"^\s*(-?\d+(?:[.,]\d+)?)", formatted)
+                raw = match.group(1).replace(",", ".") if match else None
         try:
             value = float(raw)
         except (TypeError, ValueError):
