@@ -20,8 +20,6 @@
     .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .9fr); gap: 1rem; }
     .card { background: #fff; border: 1px solid #e1e7e1; border-radius: 1rem; padding: 1.2rem; box-shadow: 0 3px 14px rgb(21 45 32 / 4%); }
     .card h2 { font-size: 1.1rem; margin: 0 0 .9rem; }
-    .photo-placeholder { min-height: 270px; background: linear-gradient(140deg, #dbe5db, #edf0e9 53%, #c5d4c8); border-radius: .7rem; display: grid; place-items: center; text-align: center; color: #50675b; padding: 2rem; }
-    .photo-placeholder .icon { font-size: 2.4rem; display: block; margin-bottom: .5rem; }
     .subtle { color: #758179; font-size: .86rem; }
     .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
     .metric { border: 1px solid #e6ebe6; background: #fafbf9; padding: 1rem; border-radius: .75rem; min-height: 120px; }
@@ -33,14 +31,14 @@
     .history-row { display: flex; align-items: center; gap: .9rem; padding: .7rem 0; border-top: 1px solid #edf0ec; }
     .history-icon { height: 42px; width: 52px; border-radius: .5rem; background: #e7ece5; display: grid; place-items: center; }
     footer { max-width: 1100px; margin: 0 auto; padding: 0 1rem 2rem; font-size: .8rem; color: #7b867e; }
-    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .photo-placeholder { min-height: 210px; } }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <header>
     <div class="eyebrow">Hyttestatus</div>
     <h1>{{ location_name }}</h1>
-    <p>Et samlet overblikk over bilder og energistatus.</p>
+    <p>Et samlet overblikk over energi- og hyttestatus.</p>
     <p style="margin-top:.8rem"><a href="/advanced" style="display:inline-block;color:#173b32;background:#fff;border-radius:999px;padding:.55rem .9rem;text-decoration:none;font-weight:600">Åpne avansert energipanel →</a></p>
   </header>
   <main>
@@ -53,13 +51,6 @@
       </span>
     </div>
     <div class="grid">
-      <section class="card">
-        <h2>Dagens bilde</h2>
-        <div class="photo-placeholder">
-          <div><span class="icon">⌁</span><strong>Ingen bilder mottatt ennå</strong><p class="subtle">Når kameraopplasting er satt opp, vises siste bilde her.</p></div>
-        </div>
-        <p class="subtle">Tidspunkt for siste bilde vil vises her.</p>
-      </section>
       <section class="card">
         <h2>Strømstatus</h2>
         <div class="metrics">
@@ -300,13 +291,6 @@
       load(14);
     })();
     </script>
-    <section class="card history">
-      <h2>Bildehistorikk</h2>
-      <div class="history-row">
-        <div class="history-icon">▧</div>
-        <div><strong>Historikk blir tilgjengelig her</strong><div class="subtle">Bilder sorteres etter dato når opplastingen er konfigurert.</div></div>
-      </div>
-    </section>
   </main>
   <footer>Hyttestatus · {{ year }} · Prototype for én lokasjon</footer>
 </body>
