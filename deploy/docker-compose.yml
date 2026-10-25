@@ -8,11 +8,8 @@ services:
       - ../.env
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      MEDIA_ROOT: /app/media
     ports:
       - "127.0.0.1:8088:8000"
-    volumes:
-      - ${HYTTESTATUS_MEDIA_PATH:-../data/media}:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -34,8 +31,6 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       MEDIA_ROOT: /app/media
-    volumes:
-      - ${HYTTESTATUS_MEDIA_PATH:-../data/media}:/app/media
     depends_on:
       db:
         condition: service_healthy
