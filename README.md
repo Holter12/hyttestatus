@@ -16,7 +16,7 @@ A remote cabin status portal for Victron VRM telemetry and energy history.
 - Environment template and gitignore.
 - Architecture, security, VRM-integration, MVP, and Unraid deployment notes.
 
-**Important:** this is a development skeleton. Authentication, actual VRM synchronization, image ingestion, database models/migrations, and retention are not implemented. Do not expose it publicly or put real credentials/images into it yet.
+**Important:** this is a development skeleton. Authentication, actual VRM synchronization, database models/migrations and retention are not implemented. Do not expose it publicly or put real credentials into it yet.
 
 ## MVP goals
 
@@ -67,7 +67,7 @@ hyttestatus/
 
 1. Clone the repository on the Unraid host or a suitable development machine.
 2. Copy `.env.example` to `.env` and choose strong, unique passwords/secrets.
-3. Set `HYTTESTATUS_DB_PATH` and `HYTTESTATUS_MEDIA_PATH` to persistent Unraid directories.
+3. Set `HYTTESTATUS_DB_PATH` to a persistent Unraid directory.
 4. Run:
 
    ```sh
@@ -83,12 +83,11 @@ See [docs/unraid-deployment.md](docs/unraid-deployment.md) before deploying.
 1. Build and test against one location first.
 2. Make offline/stale status explicit; never present old readings as live.
 3. Use per-location access control so the project can grow into a hosted multi-customer service.
-5. Do not commit credentials, tokens, private images, or production configuration to Git.
+5. Do not commit credentials, tokens, or production configuration to Git.
 
 ## Milestones
 
 1. [x] Initialize repository documentation, architecture, Compose skeleton and dashboard prototype.
-2. [ ] Confirm image source and upload method.
 3. [ ] Add authentication and role-based access before external use.
 4. [ ] Integrate VRM data and local persistence.
 5. [ ] Test offline/retry behaviour, backups, and restore.
