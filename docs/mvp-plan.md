@@ -10,7 +10,6 @@
 ## Milestone 2 — One-location dashboard
 
 - [ ] Configure one location from environment or database.
-- [ ] Show latest image and date/time it was captured/received.
 - [ ] Show battery SOC/voltage only when real data is available.
 - [ ] Show freshness and offline/stale states.
 
@@ -22,22 +21,14 @@
 - [ ] Plot recent history.
 - [ ] Add tests for API failures and missing device values.
 
-## Milestone 4 — Image history
-
-- [ ] Define camera model and image creation/upload method.
-- [ ] Add authenticated, retryable upload endpoint.
-- [ ] Store media with stable location/date metadata.
-- [ ] Build date-based gallery.
-- [ ] Add retention settings.
-
-## Milestone 5 — Access control
+## Milestone 4 — Access control
 
 - [ ] Add secure login and hashed passwords.
 - [ ] Enforce guest, owner and installer permissions server-side.
 - [ ] Add per-location authorization tests.
 - [ ] Verify media links do not bypass authorization.
 
-## Milestone 6 — Pilot readiness
+## Milestone 5 — Pilot readiness
 
 - [ ] Configure HTTPS/private access.
 - [ ] Document Unraid deployment and upgrades.
