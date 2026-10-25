@@ -89,12 +89,14 @@ def read_samples(days: int = 7) -> dict[str, Any]:
         series.setdefault(instance, {}).setdefault(code, []).append({
             "timestamp": int(row["sampled_at"].timestamp()),
             "value": row["value"],
+            "description": row["description"],
         })
     return {
         "days": days,
         "sampling_interval_minutes": int(os.getenv("VRM_POLL_INTERVAL_SECONDS", "300")) // 60,
         "data_source": "Lokalt lagrede VRM-diagnostikkmålinger",
         "sample_count": len(rows),
+        "latest_sample_at": rows[-1]["sampled_at"].isoformat() if rows else None,
         "latitude": float(os.getenv("LATITUDE")) if os.getenv("LATITUDE") else None,
         "longitude": float(os.getenv("LONGITUDE")) if os.getenv("LONGITUDE") else None,
         "series": series,
