@@ -1,6 +1,6 @@
 # Hyttestatus
 
-A remote cabin status portal combining daily camera images, image history, and Victron VRM telemetry.
+A remote cabin status portal for Victron VRM telemetry and energy history.
 
 ## Project status
 
@@ -20,12 +20,10 @@ A remote cabin status portal combining daily camera images, image history, and V
 
 ## MVP goals
 
-- Show the latest successfully received cabin image and its capture/receipt timestamps.
-- Browse image history by date.
 - Show selected Victron VRM metrics with a clear **last updated** timestamp.
 - Continue to show locally cached data when the cabin or VRM is offline.
 - Provide role-based views:
-  - **Guest:** latest image, image history and selected high-level status.
+  - **Guest:** selected high-level status.
   - **Owner:** guest view plus energy trends and battery/solar history.
   - **Installer:** diagnostics, device-level readings and integration health.
 - Keep all secrets server-side; never expose VRM credentials to the browser.
@@ -36,11 +34,10 @@ A remote cabin status portal combining daily camera images, image history, and V
 - **Web frontend:** responsive web UI.
 - **API:** Python + FastAPI.
 - **Database:** PostgreSQL for location metadata, users, telemetry and sync state.
-- **Media storage:** persistent filesystem volume, partitioned by location and date.
 - **VRM sync worker:** scheduled polling/import job; cache results locally.
 - **Deployment:** Docker Compose on Unraid.
 
-The exact image-ingestion method and external access path are still to be decided. Avoid exposing Unraid administration, the camera, or the VRM API token directly to the public internet.
+Avoid exposing Unraid administration or the VRM API token directly to the public internet.
 
 ## Repository layout
 
@@ -86,7 +83,6 @@ See [docs/unraid-deployment.md](docs/unraid-deployment.md) before deploying.
 1. Build and test against one location first.
 2. Make offline/stale status explicit; never present old readings as live.
 3. Use per-location access control so the project can grow into a hosted multi-customer service.
-4. Keep camera/media access separate from installer-only telemetry.
 5. Do not commit credentials, tokens, private images, or production configuration to Git.
 
 ## Milestones
@@ -95,8 +91,7 @@ See [docs/unraid-deployment.md](docs/unraid-deployment.md) before deploying.
 2. [ ] Confirm image source and upload method.
 3. [ ] Add authentication and role-based access before external use.
 4. [ ] Integrate VRM data and local persistence.
-5. [ ] Add image upload/synchronization and date-based gallery.
-6. [ ] Test offline/retry behaviour, backups, and restore.
+5. [ ] Test offline/retry behaviour, backups, and restore.
 
 ## Configuration
 
