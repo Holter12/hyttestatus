@@ -107,7 +107,7 @@
           points=configs.map(c=>({label:c[0],values:get(c[1],c[2])}));
           configs.forEach(c=>{const a=get(c[1],c[2]),last=a[a.length-1];document.getElementById(c[3]).textContent=last?last.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' °C':'—';document.getElementById(c[4]).textContent=last?'Sist lagret '+fmtTime(last.timestamp):'Ingen måling lagret';});
           const hin=get(24,'tsH'),hout=get(25,'tsH'),lh=hin[hin.length-1],lo=hout[hout.length-1];
-          document.getElementById('temp-humidity').textContent=(lh?lh.value.toLocaleString('no-NO',{maximumFractionDigits:1)+' %':'—')+' / '+(lo?lo.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' %':'—');
+          document.getElementById('temp-humidity').textContent=(lh?lh.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' %':'—')+' / '+(lo?lo.value.toLocaleString('no-NO',{maximumFractionDigits:1})+' %':'—');
           document.getElementById('temp-humidity-time').textContent='Hytte / ute · siste lagrede verdier';
           draw();note.textContent=(d.sample_count||0)+' lokale måleverdier · siste registrering '+(d.latest_sample_at||'ukjent tidspunkt')+'. Verdiene er sist lagret, ikke nødvendigvis sanntid.';
         }catch(e){points=[];draw();note.textContent='Lokal historikk utilgjengelig: '+e.message;}
