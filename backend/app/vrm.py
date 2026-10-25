@@ -386,6 +386,7 @@ def get_diagnostic_samples() -> list[dict[str, Any]]:
             "instance": item.get("instance", "unknown"),
             "code": item.get("code"),
             "description": item.get("description"),
+            "timestamp": item.get("timestamp"),
             "value": value,
         })
     return samples
