@@ -7,7 +7,6 @@ This is a development skeleton, not a production-ready public service.
 Create persistent host directories in your preferred Unraid appdata location, for example:
 
 - `/mnt/user/appdata/hyttestatus/postgres`
-- `/mnt/user/appdata/hyttestatus/media`
 
 Ensure the Docker containers can write to these directories. Keep backups outside the same physical storage pool where possible.
 
@@ -19,7 +18,6 @@ Add these host paths to `.env`:
 
 ```dotenv
 HYTTESTATUS_DB_PATH=/mnt/user/appdata/hyttestatus/postgres
-HYTTESTATUS_MEDIA_PATH=/mnt/user/appdata/hyttestatus/media
 ```
 
 ## 3. Start services
@@ -49,7 +47,6 @@ Expected health response:
 
 - No authentication is implemented yet; do not publish this prototype to the internet.
 - VRM integration is not implemented yet.
-- Media upload/history API is not implemented yet.
 - The worker is a placeholder and does not run scheduled jobs yet.
 - Database models/migrations are not implemented yet.
-- Configure backups and HTTPS/access controls before using real images or production credentials.
+- Configure backups and HTTPS/access controls before using production credentials.
