@@ -130,8 +130,13 @@
           {% endif %}
         </div>
         <div class="metric">
-          <div class="label">Mengde igjen</div>
+          <div class="label">Mengde igjen · målt av Victron</div>
           <div class="value">{{ '%.0f'|format(status.tank_remaining_liters) if status.tank_remaining_liters is not none else '—' }} <span class="unit">liter</span></div>
+          {% if status.tank_remaining_liters is not none %}
+          <div class="subtle">Estimert intervall:
+            {{ '%.0f'|format([0, status.tank_remaining_liters - 5]|max) }}–{{ '%.0f'|format([status.tank_capacity_liters, status.tank_remaining_liters + 5]|min if status.tank_capacity_liters is not none else status.tank_remaining_liters + 5) }} L
+          </div>
+          {% endif %}
         </div>
         <div class="metric">
           <div class="label">Tankkapasitet</div>
@@ -212,7 +217,8 @@
             x.font='11px sans-serif';x.fillStyle='#758179';x.strokeStyle='#e2e8e2';
             for(let i=0;i<=4;i++){const y=T+ph*i/4;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText((hi-(hi-lo)*i/4).toFixed(0),2,y+4);}
             x.strokeStyle='#237b52';x.lineWidth=2;x.beginPath();
-            pts.forEach((p,i)=>{if(i===0)x.moveTo(px(p.timestamp),py(p.liters));else x.lineTo(px(p.timestamp),py(p.liters));});x.stroke();
+            // Tankmåleren har ca. 10 L oppløsning: vis hvert målepunkt som et trinn.
+            pts.forEach((p,i)=>{if(i===0)x.moveTo(px(p.timestamp),py(p.liters));else{x.lineTo(px(p.timestamp),py(pts[i-1].liters));x.lineTo(px(p.timestamp),py(p.liters));}});x.stroke();
             [pts[0],pts[pts.length-1]].forEach(p=>{x.fillStyle='#237b52';x.beginPath();x.arc(px(p.timestamp),py(p.liters),3,0,Math.PI*2);x.fill();});
             x.fillStyle='#758179';x.font='10px sans-serif';
             x.fillText(new Date(t0).toLocaleDateString('no-NO',{day:'2-digit',month:'2-digit'}),L,h-12);
@@ -220,7 +226,7 @@
             x.fillText(endLabel,w-R-28,h-12);
           }
           c._tankChartState=tankChartState;
-          tankNote.textContent=pts.length?'Viser '+pts.length+' målepunkter. Hold musepekeren over grafen eller trykk for dato og liter. Differansen er et estimat basert på tanknivå; påfylling og målevariasjoner påvirker resultatet.':(data.note||'Ingen historiske tankmålinger tilgjengelig i VRM for denne perioden.');
+          tankNote.textContent=pts.length?'Viser '+pts.length+' målepunkter som trinn (ca. 10 L oppløsning). Hold musepekeren over grafen eller trykk for dato og liter. Differansen er et estimat; påfylling og målevariasjoner påvirker resultatet.':(data.note||'Ingen historiske tankmålinger tilgjengelig i VRM for denne perioden.');
         }catch(e){tankNote.textContent='Tankhistorikk kunne ikke hentes: '+e.message;}
       }
       const tankCanvas=document.getElementById('tank-history-chart');
